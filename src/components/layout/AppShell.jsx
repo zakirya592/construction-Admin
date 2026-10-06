@@ -1,7 +1,7 @@
 import { NavLink, Outlet, useLocation, useNavigate } from "react-router-dom";
-import { Button, Dropdown, Label } from "@heroui/react";
+import { Button } from "@heroui/react";
 import { motion } from "framer-motion";
-import { BadgeCheck, HardHat, Image, Info, ListOrdered, Megaphone, PanelBottom, PanelTop, Phone, Plus, Quote, Wrench } from "lucide-react";
+import { BadgeCheck, HardHat, Image, Info, ListOrdered, LogOut, Megaphone, PanelBottom, PanelTop, Phone, Plus, Quote, Wrench } from "lucide-react";
 import { landingSections } from "@/landing/sections";
 import { useOffice } from "@/office";
 
@@ -32,7 +32,7 @@ function initials(name) {
 }
 
 export function AppShell() {
-  const { user, logout, restore } = useOffice();
+  const { user, logout } = useOffice();
   const navigate = useNavigate();
   const { pathname } = useLocation();
   const today = new Intl.DateTimeFormat("en-US", {
@@ -43,48 +43,40 @@ export function AppShell() {
 
   return (
     <div className="min-h-screen bg-paper text-ink">
-      <header className="sticky top-0 z-20 border-b border-line/80 bg-paper/90 backdrop-blur">
-        <div className="flex items-center justify-between gap-3 px-4 py-3 md:px-8">
-          <div className="flex items-center gap-3">
-            <div className="grid h-10 w-10 place-items-center rounded-xl bg-ink font-semibold text-amber-200">N</div>
-            <div>
-              <p className="text-[11px] tracking-[0.22em] text-amber-800/80">NORTHLINE</p>
-              <p className="text-sm text-stone-500">{today}</p>
+      <header className="sticky top-0 z-20 border-b border-line bg-paper/95 backdrop-blur">
+        <div className="flex flex-wrap items-center justify-between gap-x-6 gap-y-3 px-4 py-3.5 md:px-8">
+          <div className="flex min-w-0 items-center gap-3">
+            <div className="grid h-11 w-11 shrink-0 place-items-center rounded-2xl bg-ink text-[15px] font-semibold text-amber-200 ring-1 ring-amber-200/30">N</div>
+            <div className="min-w-0">
+              <p className="font-serif text-[1.35rem] leading-none tracking-tight text-ink">Northline</p>
+              <p className="mt-1 text-xs tracking-wide text-stone-500">{today}</p>
             </div>
           </div>
-          <Dropdown>
-            <Dropdown.Trigger className="flex items-center gap-2 rounded-xl px-2 py-1 text-left hover:bg-sand">
-              <span className="grid h-8 w-8 place-items-center rounded-full bg-ink text-xs text-amber-200">{initials(user?.name)}</span>
-              <span className="hidden sm:block">
-                <span className="block text-sm leading-tight">{user?.name}</span>
-                <span className="block text-xs text-stone-500">{user?.email}</span>
+          <div className="flex flex-wrap items-center gap-2 sm:gap-3">
+            <Button variant="primary" className="rounded-full px-4" onPress={() => navigate("/sections/new")}>
+              <Plus size={15} /> Add Section
+            </Button>
+            <span className="hidden h-8 w-px bg-line sm:block" aria-hidden="true" />
+            <div className="flex min-w-0 items-center gap-2.5 rounded-full bg-white/80 py-1 pr-3 pl-1 ring-1 ring-line">
+              <span className="grid h-8 w-8 shrink-0 place-items-center rounded-full bg-sand text-xs font-semibold text-ink">{initials(user?.name)}</span>
+              <span className="hidden min-w-0 sm:block">
+                <span className="block truncate text-sm leading-tight font-medium">{user?.name}</span>
+                <span className="block truncate text-xs leading-tight text-stone-500">{user?.email}</span>
               </span>
-            </Dropdown.Trigger>
-            <Dropdown.Popover>
-              <Dropdown.Menu
-                aria-label="Account"
-                onAction={(key) => {
-                  if (key === "restore") restore();
-                  if (key === "logout") {
-                    logout();
-                    navigate("/login");
-                  }
-                }}
-              >
-             
-                <Dropdown.Item id="logout">
-                  <Label>Sign out</Label>
-                </Dropdown.Item>
-              </Dropdown.Menu>
-            </Dropdown.Popover>
-          </Dropdown>
+            </div>
+            <Button
+              variant="ghost"
+              className="rounded-full text-stone-600"
+              onPress={() => {
+                logout();
+                navigate("/login");
+              }}
+            >
+              <LogOut size={15} /> Sign out
+            </Button>
+          </div>
         </div>
-        <div className="flex justify-end px-4 pt-1 md:px-8">
-          <Button variant="primary" onPress={() => navigate("/sections/new")}>
-            <Plus size={16} /> Add Section
-          </Button>
-        </div>
-        <nav aria-label="Sections" className="section-tabs flex gap-1 overflow-x-auto px-4 md:px-8">
+        <nav aria-label="Sections" className="section-tabs flex gap-1 overflow-x-auto px-3 md:px-6">
           {nav.map((item) => {
             const Icon = item.icon;
             const active = pathname === item.to || pathname.startsWith(`${item.to}/`);
@@ -92,7 +84,7 @@ export function AppShell() {
               <NavLink
                 key={item.to}
                 to={item.to}
-                className={`flex shrink-0 items-center gap-2 border-b-2 px-3 py-2.5 text-sm ${active ? "border-amber-700 text-ink" : "border-transparent text-stone-500 hover:text-ink"}`}
+                className={`flex shrink-0 items-center gap-2 border-b-2 px-3 py-3 text-sm ${active ? "border-amber-700 font-medium text-ink" : "border-transparent text-stone-500 hover:text-ink"}`}
               >
                 <Icon size={15} />
                 {item.label}
