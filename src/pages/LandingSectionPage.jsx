@@ -1,10 +1,10 @@
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { Button, Chip } from "@heroui/react";
-import { Plus, Trash2 } from "lucide-react";
+import { Pencil, Plus, Trash2 } from "lucide-react";
 import { toast } from "react-toastify";
 import { DataTable } from "@/components/DataTable";
-import { AreaControl, TextControl } from "@/components/Fields";
+import { AreaControl, ConfirmDialog, TextControl } from "@/components/Fields";
 import { PageHeader } from "@/components/PageBits";
 import { findSection } from "@/landing/sections";
 import newRequest from "@/utils/userRequest";
@@ -260,9 +260,12 @@ export function LandingSectionPage({ sectionKey, mode = "view" }) {
   const section = findSection(sectionKey);
   const navigate = useNavigate();
   const isAdd = mode === "add";
+  const isEdit = mode === "edit";
   const [form, setForm] = useState(null);
   const [loading, setLoading] = useState(true);
   const [pending, setPending] = useState(false);
+  const [statusPending, setStatusPending] = useState(false);
+  const [deleteOpen, setDeleteOpen] = useState(false);
   const [error, setError] = useState("");
 
   useEffect(() => {
@@ -312,11 +315,14 @@ export function LandingSectionPage({ sectionKey, mode = "view" }) {
     event.preventDefault();
     setPending(true);
     try {
-      const response = await newRequest.post("/api/landing-page", appendForm(section, form));
+      const body = appendForm(section, form);
+      const response = isAdd
+        ? await newRequest.post("/api/landing-page", body)
+        : await newRequest.put(`/api/landing-page/${section.key}`, body);
       const message = response.data?.message;
       if (response.data?.status === false) throw new Error(message || "Could not save this section");
       toast.success(message || `${section.name} saved`);
-      if (isAdd) navigate(section.path);
+      if (isAdd || isEdit) navigate(section.path);
     } catch (err) {
       toast.error(messageFromApi(err, "Could not save this section"));
     } finally {
@@ -326,16 +332,53 @@ export function LandingSectionPage({ sectionKey, mode = "view" }) {
 
   const hasAddPage = section.key === "header" || section.key === "projects";
   const addLabel = section.key === "header" ? "Add header" : "Add project";
-  const pageTitle = isAdd ? addLabel : section.key === "projects" && form?.title ? form.title : section.name;
+  const pageTitle = isAdd ? addLabel : isEdit ? `Edit ${section.name}` : section.key === "projects" && form?.title ? form.title : section.name;
   const pageDescription = isAdd
     ? section.key === "header"
       ? "Create the header. This page does not load the saved header."
       : "Fill in this section, then save. Existing items stay in the form so they are not dropped."
-    : section.key === "header"
-      ? "Loaded from the header section."
-      : section.key === "projects" && form?.description
-        ? form.description
-        : "Saved with the landing page form, including pictures only when you choose a file.";
+    : isEdit
+      ? `Update the saved ${section.name.toLowerCase()}.`
+      : section.key === "header"
+        ? "Loaded from the header section."
+        : section.key === "projects" && form?.description
+          ? form.description
+          : "Saved with the landing page form, including pictures only when you choose a file.";
+
+  async function onToggleStatus() {
+    if (!form?.raw) return;
+    const next = form.raw.isActive === false;
+    setStatusPending(true);
+    try {
+      const response = await newRequest.patch(`/api/landing-page/${section.key}/status`, { isActive: next });
+      const message = response.data?.message;
+      if (response.data?.status === false) throw new Error(message || "Could not update status");
+      const data = response.data?.data;
+      if (data && typeof data === "object" && data.sectionKey) setForm(formFromApi(section, data));
+      else setForm((current) => ({ ...current, raw: { ...current.raw, isActive: next } }));
+      toast.success(message || (next ? `${section.name} is active` : `${section.name} is hidden`));
+    } catch (err) {
+      toast.error(messageFromApi(err, "Could not update status"));
+    } finally {
+      setStatusPending(false);
+    }
+  }
+
+  async function onDelete() {
+    setPending(true);
+    try {
+      const response = await newRequest.delete(`/api/landing-page/${section.key}`);
+      const message = response.data?.message;
+      if (response.data?.status === false) throw new Error(message || "Could not delete this section");
+      toast.success(message || `${section.name} deleted`);
+      setForm(emptyForm(section));
+      setDeleteOpen(false);
+    } catch (err) {
+      toast.error(messageFromApi(err, "Could not delete this section"));
+    } finally {
+      setPending(false);
+    }
+  }
 
   return (
     <div>
@@ -350,7 +393,22 @@ export function LandingSectionPage({ sectionKey, mode = "view" }) {
                 {form.raw.isActive === false ? "Hidden" : "Active"}
               </Chip>
             ) : null}
-            {!isAdd && hasAddPage && (
+            {!isAdd && !isEdit && form?.raw && (
+              <Button variant="outline" onPress={onToggleStatus} isPending={statusPending}>
+                {form.raw.isActive === false ? "Show" : "Hide"}
+              </Button>
+            )}
+            {!isAdd && !isEdit && hasAddPage && form?.raw && (
+              <Button variant="outline" onPress={() => navigate(`${section.path}/edit`)}>
+                <Pencil size={16} /> Edit
+              </Button>
+            )}
+            {!isAdd && !isEdit && form?.raw && (
+              <Button variant="danger" onPress={() => setDeleteOpen(true)}>
+                <Trash2 size={16} /> Delete
+              </Button>
+            )}
+            {!isAdd && !isEdit && hasAddPage && (
               <Button variant="primary" onPress={() => navigate(`${section.path}/new`)}>
                 <Plus size={16} /> {addLabel}
               </Button>
@@ -360,17 +418,17 @@ export function LandingSectionPage({ sectionKey, mode = "view" }) {
       />
       {loading && <p className="text-sm text-stone-500">Loading {section.name.toLowerCase()}…</p>}
       {error && <p className="mb-4 text-sm text-stone-500">{error}</p>}
-      {form && !isAdd && section.key === "header" && (
+      {form && !isAdd && !isEdit && section.key === "header" && (
         <div className="mb-6">
           <HeaderBoard form={form} />
         </div>
       )}
-      {form && !isAdd && section.key === "projects" && (
+      {form && !isAdd && !isEdit && section.key === "projects" && (
         <div className="mb-8">
           <ProjectsBoard form={form} />
         </div>
       )}
-      {form && (isAdd || !hasAddPage) && (
+      {form && (isAdd || isEdit || !hasAddPage) && (
         <form className="flex flex-col gap-6" onSubmit={onSubmit}>
           <section className="rounded-2xl border border-line bg-white p-5 md:p-6">
             <h2 className="font-serif text-2xl">Section</h2>
@@ -455,6 +513,14 @@ export function LandingSectionPage({ sectionKey, mode = "view" }) {
           </div>
         </form>
       )}
+      <ConfirmDialog
+        title={`Delete ${section.name}?`}
+        body={`This removes the ${section.name.toLowerCase()} section from the landing page.`}
+        open={deleteOpen}
+        onOpenChange={setDeleteOpen}
+        onConfirm={onDelete}
+        pending={pending}
+      />
     </div>
   );
 }

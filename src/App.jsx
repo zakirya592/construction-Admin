@@ -28,7 +28,9 @@ export default function App() {
         >
           <Route index element={<Navigate to="/header" replace />} />
           <Route path="header/new" element={<LandingSectionPage sectionKey="header" mode="add" />} />
+          <Route path="header/edit" element={<LandingSectionPage sectionKey="header" mode="edit" />} />
           <Route path="projects/new" element={<LandingSectionPage sectionKey="projects" mode="add" />} />
+          <Route path="projects/edit" element={<LandingSectionPage sectionKey="projects" mode="edit" />} />
           {landingSections.map((section) => (
             <Route key={section.key} path={section.path.slice(1)} element={<LandingSectionPage sectionKey={section.key} />} />
           ))}
