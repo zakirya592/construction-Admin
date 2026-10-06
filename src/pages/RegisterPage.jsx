@@ -6,9 +6,10 @@ import { toast } from "react-toastify";
 import { AuthLayout } from "@/components/layout/AuthLayout";
 import { useOffice } from "@/office";
 
-export function LoginPage() {
-  const { user, login } = useOffice();
+export function RegisterPage() {
+  const { user, register } = useOffice();
   const navigate = useNavigate();
+  const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
@@ -20,11 +21,11 @@ export function LoginPage() {
     event.preventDefault();
     setPending(true);
     try {
-      const message = await login(email, password);
-      toast.success(message || "Logged in successfully");
-      navigate("/");
+      const result = await register(name, email, password);
+      toast.success(result.message || "Account created");
+      navigate(result.signedIn ? "/" : "/login");
     } catch (error) {
-      toast.error(error instanceof Error ? error.message : "Sign in failed");
+      toast.error(error instanceof Error ? error.message : "Registration failed");
     } finally {
       setPending(false);
     }
@@ -34,19 +35,23 @@ export function LoginPage() {
     <AuthLayout>
       <Card className="border border-line bg-white shadow-none">
         <Card.Header>
-          <Card.Title className="font-serif text-3xl">Sign in</Card.Title>
-          <Card.Description>Sign in with your office email.</Card.Description>
+          <Card.Title className="font-serif text-3xl">Create an account</Card.Title>
+          <Card.Description>Name, email, and a password for the office.</Card.Description>
         </Card.Header>
         <Card.Content>
           <form className="flex flex-col gap-4" onSubmit={onSubmit}>
+            <TextField value={name} onChange={setName} isRequired>
+              <Label>Name</Label>
+              <Input autoComplete="name" />
+            </TextField>
             <TextField value={email} onChange={setEmail} isRequired>
               <Label>Email</Label>
-              <Input type="email" autoComplete="username" />
+              <Input type="email" autoComplete="email" />
             </TextField>
-            <TextField value={password} onChange={setPassword} isRequired>
+            <TextField value={password} onChange={setPassword} isRequired minLength={8}>
               <Label>Password</Label>
               <InputGroup>
-                <InputGroup.Input type={showPassword ? "text" : "password"} autoComplete="current-password" />
+                <InputGroup.Input type={showPassword ? "text" : "password"} autoComplete="new-password" minLength={8} />
                 <InputGroup.Suffix className="px-1">
                   <Button isIconOnly aria-label={showPassword ? "Hide password" : "Show password"} variant="ghost" size="sm" type="button" onPress={() => setShowPassword((visible) => !visible)}>
                     {showPassword ? <EyeOff size={16} /> : <Eye size={16} />}
@@ -55,13 +60,13 @@ export function LoginPage() {
               </InputGroup>
             </TextField>
             <Button type="submit" variant="primary" isPending={pending}>
-              Open the office
+              Create account
             </Button>
           </form>
           <p className="mt-4 text-center text-sm text-stone-600">
-            Need an account?{" "}
-            <Link to="/register" className="font-medium text-amber-800 hover:underline">
-              Create one
+            Already have an account?{" "}
+            <Link to="/login" className="font-medium text-amber-800 hover:underline">
+              Sign in
             </Link>
           </p>
         </Card.Content>

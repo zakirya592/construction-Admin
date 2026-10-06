@@ -39,6 +39,30 @@ body {
   font-family: var(--font-serif);
 }
 
+.office-table-scroll {
+  scrollbar-width: thin;
+  scrollbar-color: #c4b8a5 transparent;
+}
+
+.office-table-scroll::-webkit-scrollbar {
+  height: 10px;
+}
+
+.office-table-scroll::-webkit-scrollbar-thumb {
+  background: #c4b8a5;
+  border-radius: 999px;
+}
+
+.office-table-scroll .table-root {
+  overflow: visible;
+  width: max-content;
+  min-width: 100%;
+}
+
+.office-table-scroll .table__scroll-container {
+  overflow: visible;
+}
+
 .Toastify__toast {
   font-family: var(--font-sans);
   border-radius: 14px;

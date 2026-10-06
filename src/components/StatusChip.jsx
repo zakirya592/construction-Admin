@@ -1,5 +1,5 @@
 import { Chip } from "@heroui/react";
-import { labelize } from "@/lib/format";
+import { labelize } from "@/format";
 const tones = {
     active: "bg-emerald-100 text-emerald-900",
     complete: "bg-stone-200 text-stone-800",

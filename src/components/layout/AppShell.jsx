@@ -1,31 +1,42 @@
 import { useState } from "react";
 import { NavLink, Outlet, useNavigate } from "react-router-dom";
-import { useQueryClient } from "@tanstack/react-query";
 import { Button, Dropdown, Label } from "@heroui/react";
 import { motion } from "framer-motion";
-import { HardHat, LayoutDashboard, Menu, X } from "lucide-react";
-import { toast } from "react-toastify";
-import { useAuth } from "@/auth/AuthContext";
-import { resetOfficeData } from "@/lib/api";
-const nav = [
-    { to: "/", label: "Overview", icon: LayoutDashboard },
-    { to: "/projects", label: "Projects", icon: HardHat },
-];
+import { BadgeCheck, HardHat, Image, Info, ListOrdered, Megaphone, Menu, PanelBottom, PanelTop, Phone, Quote, Wrench, X } from "lucide-react";
+import { landingSections } from "@/landing/sections";
+import { useOffice } from "@/office";
+const icons = {
+    header: PanelTop,
+    hero: Image,
+    about: Info,
+    services: Wrench,
+    projects: HardHat,
+    "why-us": BadgeCheck,
+    process: ListOrdered,
+    testimonials: Quote,
+    cta: Megaphone,
+    contact: Phone,
+    footer: PanelBottom,
+};
+const nav = landingSections.map((section) => ({
+    to: section.path,
+    label: section.name,
+    icon: icons[section.key],
+}));
+function initials(name) {
+    const parts = String(name ?? "").trim().split(/\s+/).filter(Boolean);
+    if (!parts.length) return "NL";
+    return parts.slice(0, 2).map((part) => part[0].toUpperCase()).join("");
+}
 export function AppShell() {
-    const { user, logout } = useAuth();
+    const { user, logout, restore } = useOffice();
     const navigate = useNavigate();
-    const queryClient = useQueryClient();
     const [open, setOpen] = useState(false);
     const today = new Intl.DateTimeFormat("en-US", {
         weekday: "long",
         month: "long",
         day: "numeric",
     }).format(new Date());
-    function restore() {
-        resetOfficeData();
-        queryClient.clear();
-        toast.success("Sample office restored");
-    }
     return (<div className="min-h-screen bg-paper text-ink lg:grid lg:grid-cols-[248px_1fr]">
       {open && (<button className="fixed inset-0 z-30 bg-ink/40 lg:hidden" aria-label="Close menu" onClick={() => setOpen(false)}/>)}
       <aside className={`fixed inset-y-0 left-0 z-40 flex w-[248px] flex-col bg-ink text-stone-200 transition-transform lg:static lg:translate-x-0 ${open ? "translate-x-0" : "-translate-x-full"}`}>
@@ -41,7 +52,7 @@ export function AppShell() {
             <X size={16}/>
           </Button>
         </div>
-        <nav className="flex flex-1 flex-col gap-1 px-3">
+        <nav className="flex min-h-0 flex-1 flex-col gap-1 overflow-y-auto px-3">
           {nav.map((item) => {
             const Icon = item.icon;
             return (<NavLink key={item.to} to={item.to} end={item.to === "/"} onClick={() => setOpen(false)} className="relative">
@@ -54,7 +65,7 @@ export function AppShell() {
         })}
         </nav>
         <div className="px-4 py-5 text-xs leading-5 text-stone-500">
-          Sample records stay in this browser. Nothing is sent to a server.
+          Sample records stay in this session.
         </div>
       </aside>
 
@@ -68,10 +79,10 @@ export function AppShell() {
           </div>
           <Dropdown>
             <Dropdown.Trigger className="flex items-center gap-2 rounded-xl px-2 py-1 text-left hover:bg-sand">
-              <span className="grid h-8 w-8 place-items-center rounded-full bg-ink text-xs text-amber-200">MC</span>
+              <span className="grid h-8 w-8 place-items-center rounded-full bg-ink text-xs text-amber-200">{initials(user?.name)}</span>
               <span className="hidden sm:block">
                 <span className="block text-sm leading-tight">{user?.name}</span>
-                <span className="block text-xs text-stone-500">{user?.role}</span>
+                <span className="block text-xs text-stone-500">{user?.email}</span>
               </span>
             </Dropdown.Trigger>
             <Dropdown.Popover>

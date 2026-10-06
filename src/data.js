@@ -1,4 +1,4 @@
-export const seedDatabase = () => ({
+export const createOffice = () => ({
     clients: [
         {
             id: "c1",
