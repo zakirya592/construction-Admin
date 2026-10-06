@@ -7,7 +7,7 @@ import { DataTable } from "@/components/DataTable";
 import { AreaControl, ConfirmDialog, TextControl } from "@/components/Fields";
 import { PageHeader } from "@/components/PageBits";
 import { findSection } from "@/landing/sections";
-import newRequest from "@/utils/userRequest";
+import { useDeleteLandingSection, useLandingSection, useLandingStatus, useSaveLandingSection } from "@/landing/queries";
 
 function messageFromApi(error, fallback) {
   const data = error?.response?.data;
@@ -262,43 +262,23 @@ export function LandingSectionPage({ sectionKey, mode = "view" }) {
   const isAdd = mode === "add";
   const isEdit = mode === "edit";
   const [form, setForm] = useState(null);
-  const [loading, setLoading] = useState(true);
-  const [pending, setPending] = useState(false);
-  const [statusPending, setStatusPending] = useState(false);
   const [deleteOpen, setDeleteOpen] = useState(false);
-  const [error, setError] = useState("");
+  const skipLoad = isAdd && section?.key === "header";
+  const sectionQuery = useLandingSection(section?.key, { enabled: Boolean(section) && !skipLoad });
+  const saveSection = useSaveLandingSection();
+  const statusChange = useLandingStatus();
+  const deleteSection = useDeleteLandingSection();
 
   useEffect(() => {
     const current = findSection(sectionKey);
-    if (!current) return undefined;
-    let active = true;
-    setLoading(true);
-    setError("");
-    setForm(emptyForm(current));
-    if (isAdd && current.key === "header") {
-      setLoading(false);
-      return () => {
-        active = false;
-      };
+    if (!current) return;
+    if (skipLoad) {
+      setForm(emptyForm(current));
+      return;
     }
-    newRequest
-      .get(`/api/landing-page/${current.key}`)
-      .then((response) => {
-        if (!active) return;
-        const data = response.data?.data;
-        if (data) setForm(formFromApi(current, data));
-      })
-      .catch((err) => {
-        if (!active) return;
-        setError(messageFromApi(err, "Could not load this section"));
-      })
-      .finally(() => {
-        if (active) setLoading(false);
-      });
-    return () => {
-      active = false;
-    };
-  }, [sectionKey, isAdd]);
+    if (sectionQuery.data) setForm(formFromApi(current, sectionQuery.data));
+    else if (sectionQuery.isError || sectionQuery.isSuccess) setForm(emptyForm(current));
+  }, [sectionKey, skipLoad, sectionQuery.data, sectionQuery.dataUpdatedAt, sectionQuery.isError, sectionQuery.isSuccess]);
 
   if (!section) {
     return <p className="text-sm text-stone-500">That section is not part of the landing page.</p>;
@@ -313,26 +293,22 @@ export function LandingSectionPage({ sectionKey, mode = "view" }) {
 
   async function onSubmit(event) {
     event.preventDefault();
-    setPending(true);
     try {
-      const body = appendForm(section, form);
-      const response = isAdd
-        ? await newRequest.post("/api/landing-page", body)
-        : await newRequest.put(`/api/landing-page/${section.key}`, body);
-      const message = response.data?.message;
-      if (response.data?.status === false) throw new Error(message || "Could not save this section");
-      toast.success(message || `${section.name} saved`);
+      const body = await saveSection.mutateAsync({
+        sectionKey: section.key,
+        body: appendForm(section, form),
+        create: isAdd,
+      });
+      toast.success(body?.message || `${section.name} saved`);
       if (isAdd || isEdit) navigate(section.path);
     } catch (err) {
       toast.error(messageFromApi(err, "Could not save this section"));
-    } finally {
-      setPending(false);
     }
   }
 
   const hasAddPage = section.key === "header" || section.key === "projects";
-  const addLabel = section.key === "header" ? "Add header" : "Add project";
-  const pageTitle = isAdd ? addLabel : isEdit ? `Edit ${section.name}` : section.key === "projects" && form?.title ? form.title : section.name;
+  const addLabel = section.key === `Add ${section.name}`;
+  const pageTitle = isAdd ? addLabel : isEdit ? `Edit ${section.name}` : section.key === `Edit ${section.name}` && form?.title ? form.title : section.name;
   const pageDescription = isAdd
     ? section.key === "header"
       ? "Create the header. This page does not load the saved header."
@@ -348,35 +324,22 @@ export function LandingSectionPage({ sectionKey, mode = "view" }) {
   async function onToggleStatus() {
     if (!form?.raw) return;
     const next = form.raw.isActive === false;
-    setStatusPending(true);
     try {
-      const response = await newRequest.patch(`/api/landing-page/${section.key}/status`, { isActive: next });
-      const message = response.data?.message;
-      if (response.data?.status === false) throw new Error(message || "Could not update status");
-      const data = response.data?.data;
-      if (data && typeof data === "object" && data.sectionKey) setForm(formFromApi(section, data));
-      else setForm((current) => ({ ...current, raw: { ...current.raw, isActive: next } }));
-      toast.success(message || (next ? `${section.name} is active` : `${section.name} is hidden`));
+      const body = await statusChange.mutateAsync({ sectionKey: section.key, isActive: next });
+      toast.success(body?.message || (next ? `${section.name} is active` : `${section.name} is hidden`));
     } catch (err) {
       toast.error(messageFromApi(err, "Could not update status"));
-    } finally {
-      setStatusPending(false);
     }
   }
 
   async function onDelete() {
-    setPending(true);
     try {
-      const response = await newRequest.delete(`/api/landing-page/${section.key}`);
-      const message = response.data?.message;
-      if (response.data?.status === false) throw new Error(message || "Could not delete this section");
-      toast.success(message || `${section.name} deleted`);
+      const body = await deleteSection.mutateAsync(section.key);
+      toast.success(body?.message || `${section.name} deleted`);
       setForm(emptyForm(section));
       setDeleteOpen(false);
     } catch (err) {
       toast.error(messageFromApi(err, "Could not delete this section"));
-    } finally {
-      setPending(false);
     }
   }
 
@@ -394,7 +357,7 @@ export function LandingSectionPage({ sectionKey, mode = "view" }) {
               </Chip>
             ) : null}
             {!isAdd && !isEdit && form?.raw && (
-              <Button variant="outline" onPress={onToggleStatus} isPending={statusPending}>
+              <Button variant="outline" onPress={onToggleStatus} isPending={statusChange.isPending}>
                 {form.raw.isActive === false ? "Show" : "Hide"}
               </Button>
             )}
@@ -408,16 +371,12 @@ export function LandingSectionPage({ sectionKey, mode = "view" }) {
                 <Trash2 size={16} /> Delete
               </Button>
             )}
-            {!isAdd && !isEdit && hasAddPage && (
-              <Button variant="primary" onPress={() => navigate(`${section.path}/new`)}>
-                <Plus size={16} /> {addLabel}
-              </Button>
-            )}
+           
           </div>
         }
       />
-      {loading && <p className="text-sm text-stone-500">Loading {section.name.toLowerCase()}…</p>}
-      {error && <p className="mb-4 text-sm text-stone-500">{error}</p>}
+      {sectionQuery.isLoading && <p className="text-sm text-stone-500">Loading {section.name.toLowerCase()}…</p>}
+      {sectionQuery.isError && <p className="mb-4 text-sm text-stone-500">{messageFromApi(sectionQuery.error, "Could not load this section")}</p>}
       {form && !isAdd && !isEdit && section.key === "header" && (
         <div className="mb-6">
           <HeaderBoard form={form} />
@@ -507,7 +466,7 @@ export function LandingSectionPage({ sectionKey, mode = "view" }) {
                 <Plus size={16} /> Add item
               </Button>
             ) : null}
-            <Button type="submit" variant="primary" isPending={pending}>
+            <Button type="submit" variant="primary" isPending={saveSection.isPending}>
               Save {section.name}
             </Button>
           </div>
@@ -519,7 +478,7 @@ export function LandingSectionPage({ sectionKey, mode = "view" }) {
         open={deleteOpen}
         onOpenChange={setDeleteOpen}
         onConfirm={onDelete}
-        pending={pending}
+        pending={deleteSection.isPending}
       />
     </div>
   );

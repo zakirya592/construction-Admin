@@ -53,6 +53,20 @@ body {
   border-radius: 999px;
 }
 
+.section-tabs {
+  scrollbar-width: thin;
+  scrollbar-color: #c4b8a5 transparent;
+}
+
+.section-tabs::-webkit-scrollbar {
+  height: 8px;
+}
+
+.section-tabs::-webkit-scrollbar-thumb {
+  background: #c4b8a5;
+  border-radius: 999px;
+}
+
 .office-table-scroll .table-root {
   overflow: visible;
   width: max-content;

@@ -1,8 +1,9 @@
-import { Navigate, Route, Routes } from "react-router-dom";
+import { Navigate, Route, Routes, useParams } from "react-router-dom";
 import { ToastContainer } from "react-toastify";
 import { AppShell } from "@/components/layout/AppShell";
-import { landingSections } from "@/landing/sections";
+import { findSection, landingSections } from "@/landing/sections";
 import { LandingSectionPage } from "@/pages/LandingSectionPage";
+import { AddSectionPage } from "@/pages/AddSectionPage";
 import { LoginPage } from "@/pages/LoginPage";
 import { RegisterPage } from "@/pages/RegisterPage";
 import { useOffice } from "@/office";
@@ -11,6 +12,13 @@ function RequireAuth({ children }) {
   const { user } = useOffice();
   if (!user) return <Navigate to="/login" replace />;
   return children;
+}
+
+function SectionAddRoute() {
+  const { sectionKey } = useParams();
+  const section = findSection(sectionKey);
+  if (!section) return <Navigate to="/sections/new" replace />;
+  return <LandingSectionPage sectionKey={section.key} mode="add" />;
 }
 
 export default function App() {
@@ -27,9 +35,9 @@ export default function App() {
           }
         >
           <Route index element={<Navigate to="/header" replace />} />
-          <Route path="header/new" element={<LandingSectionPage sectionKey="header" mode="add" />} />
+          <Route path="sections/new" element={<AddSectionPage />} />
+          <Route path=":sectionKey/new" element={<SectionAddRoute />} />
           <Route path="header/edit" element={<LandingSectionPage sectionKey="header" mode="edit" />} />
-          <Route path="projects/new" element={<LandingSectionPage sectionKey="projects" mode="add" />} />
           <Route path="projects/edit" element={<LandingSectionPage sectionKey="projects" mode="edit" />} />
           {landingSections.map((section) => (
             <Route key={section.key} path={section.path.slice(1)} element={<LandingSectionPage sectionKey={section.key} />} />
