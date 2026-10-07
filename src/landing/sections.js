@@ -147,6 +147,53 @@ export const landingSections = [
   },
 ];
 
+export const RESERVED_SECTION_KEYS = new Set(["sections", "new", "config", "reorder"]);
+
+export function isSectionSlug(value) {
+  return (
+    typeof value === "string" &&
+    value.length > 0 &&
+    value.length <= 40 &&
+    /^[a-z][a-z0-9]*(?:-[a-z0-9]+)*$/.test(value) &&
+    !RESERVED_SECTION_KEYS.has(value)
+  );
+}
+
+export function sectionSlug(name) {
+  return String(name ?? "")
+    .trim()
+    .toLowerCase()
+    .replace(/&/g, " and ")
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "")
+    .slice(0, 40)
+    .replace(/-+$/g, "");
+}
+
+export function genericSection(sectionKey, name, order = 0) {
+  return {
+    key: sectionKey,
+    name: name || sectionKey,
+    order,
+    path: `/${sectionKey}`,
+    custom: true,
+    scalars: ["title", "subtitle", "description"],
+    button: true,
+    file: { key: "image", label: "Image" },
+    itemFields: [
+      { key: "title", label: "Title" },
+      { key: "description", label: "Description", type: "area" },
+    ],
+  };
+}
+
 export function findSection(sectionKey) {
   return landingSections.find((section) => section.key === sectionKey) ?? null;
+}
+
+export function resolveSection(sectionKey, record) {
+  const known = findSection(sectionKey);
+  if (known) return known;
+  if (!isSectionSlug(sectionKey)) return null;
+  return genericSection(sectionKey, record?.sectionName, record?.order ?? 0);
 }

@@ -15,6 +15,17 @@ function assertOk(response, fallback) {
   return response.data;
 }
 
+export function useLandingSections() {
+  return useQuery({
+    queryKey: landingKeys.all,
+    queryFn: async () => {
+      const response = await newRequest.get("/api/landing-page");
+      const body = assertOk(response, "Could not load sections");
+      return body?.data ?? [];
+    },
+  });
+}
+
 export function useLandingSection(sectionKey, { enabled = true } = {}) {
   return useQuery({
     queryKey: landingKeys.section(sectionKey),
@@ -37,6 +48,7 @@ export function useSaveLandingSection() {
       return assertOk(response, "Could not save this section");
     },
     onSuccess: (_data, { sectionKey }) => {
+      queryClient.invalidateQueries({ queryKey: landingKeys.all });
       queryClient.invalidateQueries({ queryKey: landingKeys.section(sectionKey) });
     },
   });
@@ -69,6 +81,7 @@ export function useDeleteLandingSection() {
     },
     onSuccess: (_body, sectionKey) => {
       queryClient.setQueryData(landingKeys.section(sectionKey), null);
+      queryClient.invalidateQueries({ queryKey: landingKeys.all });
     },
   });
 }
