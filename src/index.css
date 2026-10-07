@@ -96,8 +96,31 @@ body {
   min-height: 140px;
 }
 
+.rich-text-view,
+.rich-text-view p {
+  white-space: normal;
+  overflow-wrap: anywhere;
+  word-break: break-word;
+}
+
+.rich-text-view p {
+  margin: 0;
+}
+
 .rich-text-view p + p {
   margin-top: 0.5rem;
+}
+
+.rich-text-view strong {
+  font-weight: 650;
+}
+
+.rich-text-view em {
+  font-style: italic;
+}
+
+.rich-text-view a {
+  text-decoration: underline;
 }
 
 .rich-text-view ul,

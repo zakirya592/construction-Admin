@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { Button, Chip, Modal } from "@heroui/react";
-import { Eye, Pencil, Plus, Trash2 } from "lucide-react";
+import { Building2, ClipboardList, Clock, Eye, House, Pencil, Plus, ShieldCheck, Trash2, TriangleAlert, User, Users } from "lucide-react";
 import { toast } from "react-toastify";
 import { DataTable } from "@/components/DataTable";
 import { AreaControl, ConfirmDialog, RichTextControl, TextControl } from "@/components/Fields";
@@ -44,6 +44,11 @@ function plainText(value) {
     .trim();
 }
 
+function RichCopy({ html, className = "" }) {
+  if (!plainText(html)) return null;
+  return <div className={`rich-text-view min-w-0 whitespace-normal wrap-break-word ${className}`} dangerouslySetInnerHTML={{ __html: html }} />;
+}
+
 function Detail({ label, value }) {
   const html = label === "Description" && typeof value === "string" && /<[a-z][\s\S]*>/i.test(value);
   return (
@@ -58,14 +63,212 @@ function Detail({ label, value }) {
   );
 }
 
+function useLocalImage(file, url) {
+  const [src, setSrc] = useState(url || "");
+  useEffect(() => {
+    if (!(file instanceof File)) {
+      setSrc(url || "");
+      return undefined;
+    }
+    const next = URL.createObjectURL(file);
+    setSrc(next);
+    return () => URL.revokeObjectURL(next);
+  }, [file, url]);
+  return src;
+}
+
+function splitHeroTitle(title) {
+  const words = String(title ?? "").trim().split(/\s+/).filter(Boolean);
+  if (words.length < 6) return { lead: words.join(" "), accent: "" };
+  return { lead: words.slice(0, -4).join(" "), accent: words.slice(-4).join(" ") };
+}
+
+function HeroDesign({ form }) {
+  const { lead, accent } = splitHeroTitle(form.title);
+  const image = useLocalImage(form.file, form.fileUrl);
+  const buttonLabel = String(form.buttonText ?? "").trim();
+  const buttonText = buttonLabel && !/→\s*$/.test(buttonLabel) ? `${buttonLabel} →` : buttonLabel;
+  return (
+    <div
+      className="relative flex min-h-[460px] items-center overflow-hidden bg-[#1c2430] px-8 py-14 text-white sm:px-12"
+    >
+      {image ? <img src={image} alt="" className="absolute inset-0 h-full w-full object-cover" /> : null}
+      <div className="absolute inset-0 bg-linear-to-r from-[#0c1016]/80 via-[#0c1016]/35 to-[#0c1016]/10" />
+      <div className="relative max-w-3xl">
+        {form.subtitle ? (
+          <div className="flex items-center gap-3 text-[11px] tracking-[0.28em] text-[#d4bc86] uppercase">
+            <span className="h-px w-8 bg-[#d4bc86]" />
+            {form.subtitle}
+          </div>
+        ) : null}
+        {lead ? (
+          <h2 className="mt-4 font-serif text-4xl leading-[1.05] text-white sm:text-6xl">
+            {lead}
+            {accent ? (
+              <>
+                <br />
+                <span className="text-[#c6a15b] italic">{accent}</span>
+              </>
+            ) : null}
+          </h2>
+        ) : null}
+        <RichCopy html={form.description} className="mt-6 max-w-xl text-sm leading-relaxed text-white/85 sm:text-base" />
+        {buttonText ? (
+          <span className="mt-8 inline-flex border border-[#ead9ad] bg-[#c6a15b] px-4 py-2.5 text-sm font-medium text-[#1c1408]">{buttonText}</span>
+        ) : null}
+      </div>
+    </div>
+  );
+}
+
+const aboutIcons = [User, ShieldCheck, TriangleAlert, Clock];
+
+function AboutDesign({ form, imageSide = "left" }) {
+  const image = useLocalImage(form.file, form.fileUrl);
+  const imageFirst = imageSide !== "right";
+  const filled = form.items.filter((item) => item.title || item.value || plainText(item.description));
+  const stat = filled.find((item) => String(item.value ?? "").trim());
+  const cards = filled.filter((item) => (item !== stat || item.title) && (item.title || plainText(item.description)));
+  const photo = (
+    <div className={`relative ${imageFirst ? "" : "ml-auto w-full max-w-70"}`}>
+      <div className={`absolute -bottom-3 h-[86%] w-[92%] border border-[#c9bfae] ${imageFirst ? "left-0" : "right-0"}`} />
+      <div className={`relative overflow-hidden bg-[#ddd4c4] ${imageFirst ? "ml-4" : "mr-3"}`}>
+        {image ? (
+          <img src={image} alt="" className={`w-full object-contain ${imageFirst ? "aspect-4/5" : "h-80"}`} />
+        ) : (
+          <div className={`w-full ${imageFirst ? "aspect-4/5" : "h-80"}`} />
+        )}
+        {stat ? (
+          <div className={`absolute bottom-4 max-w-45 bg-ink px-4 py-3 text-white ${imageFirst ? "right-4" : "left-4"}`}>
+            <p className="font-serif text-3xl text-[#c6a15b]">{stat.value}</p>
+            {plainText(stat.description) ? (
+              <RichCopy html={stat.description} className="mt-1 text-xs leading-snug text-white/80" />
+            ) : (
+              <p className="mt-1 text-xs leading-snug text-white/80">{stat.title}</p>
+            )}
+          </div>
+        ) : null}
+      </div>
+    </div>
+  );
+  const copy = (
+    <div>
+          {form.subtitle ? <p className="text-[11px] tracking-[0.22em] text-[#9a7433] uppercase">{form.subtitle}</p> : null}
+          {form.title ? <h2 className="mt-3 font-serif text-4xl leading-[1.05] sm:text-5xl">{form.title}</h2> : null}
+          <RichCopy html={form.description} className="mt-5 max-w-xl text-sm leading-relaxed text-stone-600 sm:text-base" />
+          {cards.length ? (
+            <div className="mt-8 grid gap-4 sm:grid-cols-2">
+              {cards.map((item, index) => {
+                const Icon = aboutIcons[index % aboutIcons.length];
+                return (
+                  <div key={item.id} className="rounded-xl border border-[#e4dccb] bg-white px-4 py-4">
+                    <span className="grid h-8 w-8 place-items-center rounded-full bg-[#f4efe6] text-[#9a7433]">
+                      <Icon size={16} />
+                    </span>
+                    {item.title ? <p className="mt-3 text-sm font-semibold">{item.title}</p> : null}
+                    <RichCopy html={item.description} className="mt-1 text-sm leading-relaxed text-stone-500" />
+                  </div>
+                );
+              })}
+            </div>
+          ) : null}
+        </div>
+  );
+  return (
+    <div className="bg-[#f4efe6] px-5 py-8 text-ink sm:px-8 sm:py-10">
+      <div className={`grid items-center gap-8 ${imageFirst ? "lg:grid-cols-2" : "lg:grid-cols-[minmax(0,1fr)_280px]"} lg:gap-12`}>
+        {imageFirst ? photo : copy}
+        {imageFirst ? copy : photo}
+      </div>
+    </div>
+  );
+}
+
+const serviceIcons = [House, Building2, House, TriangleAlert, ClipboardList, Users];
+
+function ServiceCard({ item, index }) {
+  const image = useLocalImage(item.imageFile, item.imageUrl);
+  const Icon = serviceIcons[index % serviceIcons.length];
+  const number = String(item.number || index + 1).padStart(2, "0");
+  return (
+    <article className="flex h-full flex-col bg-[#fbf8f2] px-5 py-5">
+      <div className="flex items-start justify-between text-[#9a7433]">
+        {image ? <img src={image} alt="" className="h-8 w-8 object-contain" /> : <Icon size={22} strokeWidth={1.5} />}
+        <span className="text-xs tracking-[0.18em] text-stone-400">{number}</span>
+      </div>
+      {item.title ? <h3 className="mt-8 text-lg">{item.title}</h3> : null}
+      <RichCopy html={item.description} className="mt-2 text-sm leading-relaxed text-stone-500" />
+     
+    </article>
+    //  <span className="mt-auto pt-6 text-sm text-[#9a7433]">Learn more ›</span>
+  );
+}
+
+function isVisionSection(section) {
+  return /vision|mission/i.test(`${section?.key ?? ""} ${section?.name ?? ""}`);
+}
+
+function isGoalsSection(section) {
+  return /goals/i.test(`${section?.key ?? ""} ${section?.name ?? ""}`);
+}
+
+function hasSectionPreview(section) {
+  return ["header", "hero", "about", "services"].includes(section.key) || isVisionSection(section) || isGoalsSection(section);
+}
+
+function VisionDesign({ form }) {
+  const cards = form.items.filter((item) => item.title || plainText(item.description));
+  return (
+    <div className="bg-[#f3efe6] px-6 py-10 text-ink sm:px-10 sm:py-14">
+      <p className="text-[11px] tracking-[0.22em] text-stone-500 uppercase">{form.subtitle || "Purpose"}</p>
+      <div className="mt-4 grid items-start gap-8 lg:grid-cols-2 lg:gap-20">
+        {form.title ? <h2 className="font-serif text-4xl leading-tight sm:text-5xl">{form.title}</h2> : <div />}
+        <RichCopy html={form.description} className="max-w-md text-sm leading-relaxed text-stone-500 lg:pt-3" />
+      </div>
+      {cards.length ? (
+        <div className="mt-10 grid gap-5 sm:grid-cols-2">
+          {cards.map((item, index) => (
+            <article key={item.id} className="border border-[#e4dccb] bg-[#f7f4ee] px-6 py-7">
+              <p className="font-serif text-sm text-stone-400 italic">{String(item.number || index + 1).padStart(2, "0")}</p>
+              {item.title ? <h3 className="mt-4 font-serif text-2xl">{item.title}</h3> : null}
+              <RichCopy html={item.description} className="mt-3 text-sm leading-relaxed text-stone-600" />
+            </article>
+          ))}
+        </div>
+      ) : null}
+    </div>
+  );
+}
+
+function ServicesDesign({ form }) {
+  const cards = form.items.filter((item) => item.title || item.number || plainText(item.description) || item.imageUrl || item.imageFile);
+  return (
+    <div className="bg-[#f4efe6] px-5 py-8 text-ink sm:px-8 sm:py-10">
+      <p className="text-[11px] tracking-[0.22em] text-stone-500 uppercase">{form.sectionName || "Services"}</p>
+      <div className="mt-4 grid items-start gap-6 lg:grid-cols-2 lg:gap-16">
+        {form.title ? <h2 className="font-serif text-4xl leading-[1.05] sm:text-5xl">{form.title}</h2> : <div />}
+        <RichCopy html={form.description} className="text-sm leading-relaxed text-stone-500 lg:pt-2" />
+      </div>
+      {cards.length ? (
+        <div className="mt-8 grid gap-px bg-[#e6dfd2] sm:grid-cols-2 lg:grid-cols-3">
+          {cards.map((item, index) => (
+            <ServiceCard key={item.id} item={item} index={index} />
+          ))}
+        </div>
+      ) : null}
+    </div>
+  );
+}
+
 function HeaderDesign({ form }) {
   const links = form.items.filter((item) => item.label || item.link);
   const brand = form.sectionName && form.sectionName !== "Header" ? form.sectionName : "NORTHLINE";
+  const logo = useLocalImage(form.file, form.fileUrl);
   return (
     <div className="header-preview-bar flex flex-wrap items-center gap-x-8 gap-y-4 px-6 py-4 text-white sm:px-8">
       <div className="flex shrink-0 items-center gap-3">
-        {form.fileUrl ? (
-          <img src={form.fileUrl} alt="" className="h-11 w-11 object-contain" />
+        {logo ? (
+          <img src={logo} alt="" className="h-11 w-11 object-contain" />
         ) : (
           <span className="grid h-11 w-11 place-items-center border border-[#e4d0a0] bg-[#c6a15b] font-serif text-lg text-[#1c1408]">N</span>
         )}
@@ -93,11 +296,12 @@ function HeaderDesign({ form }) {
 
 function HeaderPreview({ form }) {
   const links = form.items.filter((item) => item.label || item.link);
+  const logo = useLocalImage(form.file, form.fileUrl);
   return (
     <div className="overflow-hidden rounded-2xl border border-line bg-ink text-stone-100">
       <div className="flex flex-wrap items-center gap-x-6 gap-y-3 px-5 py-4">
-        {form.fileUrl ? (
-          <img src={form.fileUrl} alt="" className="h-10 w-auto max-w-[140px] object-contain" />
+        {logo ? (
+          <img src={logo} alt="" className="h-10 w-auto max-w-35 object-contain" />
         ) : (
           <span className="grid h-10 w-10 place-items-center rounded-xl bg-amber-400 text-sm font-semibold text-ink">N</span>
         )}
@@ -181,11 +385,11 @@ function ProjectsBoard({ form }) {
         columns={[
           { header: "Title", rowHeader: true, cell: (row) => row.title || "—" },
           { header: "Category", cell: (row) => row.category || "—" },
-          { header: "Description", cell: (row) => plainText(row.description) || "—" },
+          { header: "Description", cell: (row) => (plainText(row.description) ? <RichCopy html={row.description} className="max-w-sm text-sm" /> : "—") },
           {
             header: "Image",
             cell: (row) =>
-              row.imageUrl ? <img src={row.imageUrl} alt="" className="h-12 w-20 rounded-lg object-cover" /> : "—",
+              <ChosenImage file={row.imageFile} url={row.imageUrl} className="h-12 w-20 rounded-lg object-cover" />,
           },
           { header: "Link", cell: (row) => row.link || "—" },
         ]}
@@ -194,7 +398,14 @@ function ProjectsBoard({ form }) {
   );
 }
 
+function ChosenImage({ file, url, className }) {
+  const src = useLocalImage(file, url);
+  if (!src) return "—";
+  return <img src={src} alt="" className={className} />;
+}
+
 function FileField({ label, file, url, onChange }) {
+  const src = useLocalImage(file, url);
   return (
     <label className="flex flex-col gap-2 text-sm sm:col-span-2">
       <span>{label}</span>
@@ -204,6 +415,7 @@ function FileField({ label, file, url, onChange }) {
         className="block w-full text-sm text-stone-600 file:mr-3 file:rounded-xl file:border-0 file:bg-sand file:px-3 file:py-2 file:text-sm file:text-ink"
         onChange={(event) => onChange(event.target.files?.[0] ?? null)}
       />
+      {src ? <img src={src} alt="" className="h-28 w-full max-w-xs rounded-xl object-cover" /> : null}
       <span className="text-xs text-stone-500">{file ? file.name : url || "No image yet"}</span>
     </label>
   );
@@ -306,7 +518,7 @@ export function LandingSectionPage({ sectionKey, mode = "view" }) {
         description={pageDescription}
         action={
           <div className="flex flex-wrap items-center gap-3">
-            {section.key === "header" && form ? (
+            {hasSectionPreview(section) && form ? (
               <Button variant="outline" onPress={() => setPreviewOpen(true)}>
                 <Eye size={16} /> Preview
               </Button>
@@ -442,18 +654,42 @@ export function LandingSectionPage({ sectionKey, mode = "view" }) {
           </div>
         </form>
       )}
-      {section.key === "header" && form ? (
+      {hasSectionPreview(section) && form ? (
         <Modal isOpen={previewOpen} onOpenChange={setPreviewOpen}>
           <Modal.Backdrop>
             <Modal.Container>
-              <Modal.Dialog className="w-[94vw] max-w-[94vw]">
+              <Modal.Dialog className="w-[90vw] max-w-[90vw]">
                 <Modal.CloseTrigger />
                 <Modal.Header>
-                  <Modal.Heading className="font-serif text-2xl">Header preview</Modal.Heading>
+                  <Modal.Heading className="font-serif text-2xl">
+                    {section.key === "hero"
+                      ? "Hero preview"
+                      : section.key === "about"
+                        ? "About preview"
+                        : section.key === "services"
+                          ? "Services preview"
+                          : isVisionSection(section)
+                            ? "Vision & Mission preview"
+                            : isGoalsSection(section)
+                              ? "Our Goals preview"
+                              : "Header preview"}
+                  </Modal.Heading>
                 </Modal.Header>
                 <Modal.Body>
                   <div className="overflow-hidden rounded-xl">
-                    <HeaderDesign form={form} />
+                    {section.key === "hero" ? (
+                      <HeroDesign form={form} />
+                    ) : section.key === "about" ? (
+                      <AboutDesign form={form} />
+                    ) : section.key === "services" ? (
+                      <ServicesDesign form={form} />
+                    ) : isVisionSection(section) ? (
+                      <VisionDesign form={form} />
+                    ) : isGoalsSection(section) ? (
+                      <AboutDesign form={form} imageSide="right" />
+                    ) : (
+                      <HeaderDesign form={form} />
+                    )}
                   </div>
                 </Modal.Body>
                 <Modal.Footer>
