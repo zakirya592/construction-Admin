@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { Button, Chip } from "@heroui/react";
-import { Pencil, Plus, Trash2 } from "lucide-react";
+import { Button, Chip, Modal } from "@heroui/react";
+import { Eye, Pencil, Plus, Trash2 } from "lucide-react";
 import { toast } from "react-toastify";
 import { DataTable } from "@/components/DataTable";
 import { AreaControl, ConfirmDialog, RichTextControl, TextControl } from "@/components/Fields";
@@ -54,6 +54,39 @@ function Detail({ label, value }) {
       ) : (
         <p className="mt-1 text-sm break-words text-ink">{shown(value)}</p>
       )}
+    </div>
+  );
+}
+
+function HeaderDesign({ form }) {
+  const links = form.items.filter((item) => item.label || item.link);
+  const brand = form.sectionName && form.sectionName !== "Header" ? form.sectionName : "NORTHLINE";
+  return (
+    <div className="header-preview-bar flex flex-wrap items-center gap-x-8 gap-y-4 px-6 py-4 text-white sm:px-8">
+      <div className="flex shrink-0 items-center gap-3">
+        {form.fileUrl ? (
+          <img src={form.fileUrl} alt="" className="h-11 w-11 object-contain" />
+        ) : (
+          <span className="grid h-11 w-11 place-items-center border border-[#e4d0a0] bg-[#c6a15b] font-serif text-lg text-[#1c1408]">N</span>
+        )}
+        <span className="text-[13px] font-medium tracking-[0.28em]">{brand}</span>
+      </div>
+      <div className="flex min-w-0 flex-1 flex-wrap items-center justify-center gap-x-6 gap-y-2 text-sm">
+        {links.map((item, index) => (
+          <span key={item.id} className={index === 0 ? "border-b border-[#d4bc86] pb-0.5" : "text-white/90"}>
+            {item.label || item.link}
+          </span>
+        ))}
+      </div>
+      {form.settings.phone || form.settings.email ? (
+        <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-sm text-white/75">
+          {form.settings.phone ? <span>{form.settings.phone}</span> : null}
+          {form.settings.email ? <span>{form.settings.email}</span> : null}
+        </div>
+      ) : null}
+      {form.buttonText ? (
+        <span className="shrink-0 border border-[#ead9ad] bg-[#c6a15b] px-4 py-2 text-sm font-medium text-[#1c1408]">{form.buttonText}</span>
+      ) : null}
     </div>
   );
 }
@@ -182,6 +215,7 @@ export function LandingSectionPage({ sectionKey, mode = "view" }) {
   const isEdit = mode === "edit";
   const [form, setForm] = useState(null);
   const [deleteOpen, setDeleteOpen] = useState(false);
+  const [previewOpen, setPreviewOpen] = useState(false);
   const skipLoad = isAdd;
   const sectionQuery = useLandingSection(sectionKey, { enabled: Boolean(sectionKey) && !skipLoad });
   const section = resolveSection(sectionKey, sectionQuery.data);
@@ -272,6 +306,11 @@ export function LandingSectionPage({ sectionKey, mode = "view" }) {
         description={pageDescription}
         action={
           <div className="flex flex-wrap items-center gap-3">
+            {section.key === "header" && form ? (
+              <Button variant="outline" onPress={() => setPreviewOpen(true)}>
+                <Eye size={16} /> Preview
+              </Button>
+            ) : null}
             {form?.raw ? (
               <Chip size="sm" className={form.raw.isActive === false ? "bg-stone-200 text-stone-700" : "bg-emerald-100 text-emerald-900"}>
                 {form.raw.isActive === false ? "Hidden" : "Active"}
@@ -403,6 +442,30 @@ export function LandingSectionPage({ sectionKey, mode = "view" }) {
           </div>
         </form>
       )}
+      {section.key === "header" && form ? (
+        <Modal isOpen={previewOpen} onOpenChange={setPreviewOpen}>
+          <Modal.Backdrop>
+            <Modal.Container>
+              <Modal.Dialog className="w-[94vw] max-w-[94vw]">
+                <Modal.CloseTrigger />
+                <Modal.Header>
+                  <Modal.Heading className="font-serif text-2xl">Header preview</Modal.Heading>
+                </Modal.Header>
+                <Modal.Body>
+                  <div className="overflow-hidden rounded-xl">
+                    <HeaderDesign form={form} />
+                  </div>
+                </Modal.Body>
+                <Modal.Footer>
+                  <Button slot="close" variant="ghost">
+                    Close
+                  </Button>
+                </Modal.Footer>
+              </Modal.Dialog>
+            </Modal.Container>
+          </Modal.Backdrop>
+        </Modal>
+      ) : null}
       <ConfirmDialog
         title={`Delete ${section.name}?`}
         body={`This removes the ${section.name.toLowerCase()} section from the landing page.`}
