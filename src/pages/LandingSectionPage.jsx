@@ -4,7 +4,7 @@ import { Button, Chip } from "@heroui/react";
 import { Pencil, Plus, Trash2 } from "lucide-react";
 import { toast } from "react-toastify";
 import { DataTable } from "@/components/DataTable";
-import { AreaControl, ConfirmDialog, TextControl } from "@/components/Fields";
+import { AreaControl, ConfirmDialog, RichTextControl, TextControl } from "@/components/Fields";
 import { PageHeader } from "@/components/PageBits";
 import { blankItem, emptyForm, formFromApi, sectionBody } from "@/landing/payload";
 import { resolveSection } from "@/landing/sections";
@@ -36,11 +36,24 @@ function shownDate(value) {
   return new Intl.DateTimeFormat("en-US", { month: "short", day: "numeric", year: "numeric" }).format(date);
 }
 
+function plainText(value) {
+  return String(value ?? "")
+    .replace(/<[^>]*>/g, " ")
+    .replace(/&nbsp;/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
 function Detail({ label, value }) {
+  const html = label === "Description" && typeof value === "string" && /<[a-z][\s\S]*>/i.test(value);
   return (
     <div>
       <p className="text-[11px] tracking-[0.16em] text-stone-500 uppercase">{label}</p>
-      <p className="mt-1 text-sm break-words text-ink">{shown(value)}</p>
+      {html ? (
+        <div className="rich-text-view mt-1 text-sm text-ink" dangerouslySetInnerHTML={{ __html: value }} />
+      ) : (
+        <p className="mt-1 text-sm break-words text-ink">{shown(value)}</p>
+      )}
     </div>
   );
 }
@@ -135,7 +148,7 @@ function ProjectsBoard({ form }) {
         columns={[
           { header: "Title", rowHeader: true, cell: (row) => row.title || "—" },
           { header: "Category", cell: (row) => row.category || "—" },
-          { header: "Description", cell: (row) => row.description || "—" },
+          { header: "Description", cell: (row) => plainText(row.description) || "—" },
           {
             header: "Image",
             cell: (row) =>
@@ -305,7 +318,7 @@ export function LandingSectionPage({ sectionKey, mode = "view" }) {
               {(section.scalars ?? []).map((key) =>
                 key === "description" ? (
                   <div key={key} className="sm:col-span-2">
-                    <AreaControl label="Description" value={form.description} onChange={(description) => setForm({ ...form, description })} />
+                    <RichTextControl label="Description" value={form.description} onChange={(description) => setForm({ ...form, description })} />
                   </div>
                 ) : (
                   <TextControl key={key} label={key === "subtitle" ? "Subtitle" : "Title"} value={form[key]} onChange={(value) => setForm({ ...form, [key]: value })} />
@@ -352,6 +365,16 @@ export function LandingSectionPage({ sectionKey, mode = "view" }) {
                         file={item.imageFile}
                         url={item.imageUrl}
                         onChange={(imageFile) => updateItem(item.id, { imageFile })}
+                      />
+                    );
+                  }
+                  if (field.key === "description") {
+                    return (
+                      <RichTextControl
+                        key={field.key}
+                        label={field.label}
+                        value={item[field.key] ?? ""}
+                        onChange={(value) => updateItem(item.id, { [field.key]: value })}
                       />
                     );
                   }

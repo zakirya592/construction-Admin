@@ -1,7 +1,7 @@
 import { NavLink, Outlet, useLocation, useNavigate } from "react-router-dom";
 import { Button } from "@heroui/react";
 import { motion } from "framer-motion";
-import { BadgeCheck, HardHat, Image, Info, Layers, ListOrdered, Megaphone, PanelBottom, PanelTop, Phone, Plus, Quote, Wrench } from "lucide-react";
+import { BadgeCheck, HardHat, Image, Info, Layers, ListOrdered, LogOut, Megaphone, PanelBottom, PanelTop, Phone, Plus, Quote, Wrench } from "lucide-react";
 import { findSection, landingSections } from "@/landing/sections";
 import { useLandingSections } from "@/landing/queries";
 import { useOffice } from "@/office";

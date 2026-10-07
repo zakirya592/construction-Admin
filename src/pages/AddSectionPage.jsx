@@ -3,7 +3,7 @@ import { useNavigate } from "react-router-dom";
 import { Button } from "@heroui/react";
 import { Plus, Trash2 } from "lucide-react";
 import { toast } from "react-toastify";
-import { AreaControl, TextControl } from "@/components/Fields";
+import { AreaControl, RichTextControl, TextControl } from "@/components/Fields";
 import { PageHeader } from "@/components/PageBits";
 import { blankItem, sectionBody } from "@/landing/payload";
 import { useLandingSections, useSaveLandingSection } from "@/landing/queries";
@@ -127,7 +127,7 @@ export function AddSectionPage() {
               (section.scalars ?? []).map((key) =>
                 key === "description" ? (
                   <div key={key} className="sm:col-span-2">
-                    <AreaControl
+                    <RichTextControl
                       label="Description"
                       value={content.description}
                       onChange={(description) => setContent((current) => ({ ...current, description }))}
@@ -212,6 +212,16 @@ export function AddSectionPage() {
                       />
                       <span className="text-xs text-stone-500">{item.imageFile ? item.imageFile.name : "No image yet"}</span>
                     </label>
+                  );
+                }
+                if (field.key === "description") {
+                  return (
+                    <RichTextControl
+                      key={field.key}
+                      label={field.label}
+                      value={item[field.key] ?? ""}
+                      onChange={(value) => updateItem(item.id, { [field.key]: value })}
+                    />
                   );
                 }
                 if (field.type === "area") {

@@ -54,7 +54,14 @@ function formFromApi(section, data) {
 }
 
 function itemIsEmpty(section, item) {
-  const hasText = (section.itemFields ?? []).some((field) => field.type !== "file" && String(item[field.key] ?? "").trim());
+  const hasText = (section.itemFields ?? []).some((field) => {
+    if (field.type === "file") return false;
+    const text = String(item[field.key] ?? "")
+      .replace(/<[^>]*>/g, " ")
+      .replace(/&nbsp;/g, " ")
+      .trim();
+    return Boolean(text);
+  });
   const hasFile = item.imageFile instanceof File && item.imageFile.size > 0;
   return !hasText && !hasFile && !item.imageUrl;
 }
