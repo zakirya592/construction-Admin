@@ -1,8 +1,9 @@
 import { NavLink, Outlet, useLocation, useNavigate } from "react-router-dom";
 import { Button, Dropdown, Label } from "@heroui/react";
 import { motion } from "framer-motion";
-import { BadgeCheck, HardHat, Image, Info, ListOrdered, Megaphone, PanelBottom, PanelTop, Phone, Plus, Quote, Wrench } from "lucide-react";
-import { landingSections } from "@/landing/sections";
+import { BadgeCheck, HardHat, Image, Info, Layers, ListOrdered, Megaphone, PanelBottom, PanelTop, Phone, Plus, Quote, Wrench } from "lucide-react";
+import { findSection, landingSections } from "@/landing/sections";
+import { useLandingSections } from "@/landing/queries";
 import { useOffice } from "@/office";
 
 const icons = {
@@ -19,11 +20,25 @@ const icons = {
   footer: PanelBottom,
 };
 
-const nav = landingSections.map((section) => ({
-  to: section.path,
-  label: section.name,
-  icon: icons[section.key],
-}));
+function sectionNav(saved) {
+  const custom = (saved ?? [])
+    .filter((section) => section?.sectionKey && !findSection(section.sectionKey))
+    .sort((left, right) => (left.order ?? 0) - (right.order ?? 0))
+    .map((section) => ({
+      to: `/${section.sectionKey}`,
+      label: section.sectionName || section.sectionKey,
+      icon: Layers,
+    }));
+
+  return [
+    ...landingSections.map((section) => ({
+      to: section.path,
+      label: section.name,
+      icon: icons[section.key],
+    })),
+    ...custom,
+  ];
+}
 
 function initials(name) {
   const parts = String(name ?? "").trim().split(/\s+/).filter(Boolean);
@@ -33,6 +48,8 @@ function initials(name) {
 
 export function AppShell() {
   const { user, logout, restore } = useOffice();
+  const saved = useLandingSections();
+  const nav = sectionNav(saved.data);
   const navigate = useNavigate();
   const { pathname } = useLocation();
   const today = new Intl.DateTimeFormat("en-US", {

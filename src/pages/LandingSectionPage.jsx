@@ -6,7 +6,8 @@ import { toast } from "react-toastify";
 import { DataTable } from "@/components/DataTable";
 import { AreaControl, ConfirmDialog, TextControl } from "@/components/Fields";
 import { PageHeader } from "@/components/PageBits";
-import { findSection } from "@/landing/sections";
+import { blankItem, emptyForm, formFromApi, sectionBody } from "@/landing/payload";
+import { resolveSection } from "@/landing/sections";
 import { useDeleteLandingSection, useLandingSection, useLandingStatus, useSaveLandingSection } from "@/landing/queries";
 
 function messageFromApi(error, fallback) {
@@ -14,61 +15,6 @@ function messageFromApi(error, fallback) {
   const details = Array.isArray(data?.errors) ? data.errors.map((item) => item.message).filter(Boolean) : [];
   if (details.length) return details.join(". ");
   return data?.message || error?.message || fallback;
-}
-
-function blankItem(section) {
-  const item = { id: crypto.randomUUID(), imageFile: null, imageUrl: "" };
-  for (const field of section.itemFields ?? []) {
-    if (field.type !== "file") item[field.key] = "";
-  }
-  return item;
-}
-
-function itemFromApi(section, raw) {
-  const item = blankItem(section);
-  for (const field of section.itemFields ?? []) {
-    if (field.type === "file") item.imageUrl = raw?.[field.key] ?? "";
-    else item[field.key] = raw?.[field.key] ?? "";
-  }
-  return item;
-}
-
-function emptyForm(section) {
-  const settings = {};
-  for (const field of section.settings ?? []) settings[field.key] = "";
-  return {
-    sectionName: section.name,
-    order: String(section.order),
-    title: "",
-    subtitle: "",
-    description: "",
-    buttonText: "",
-    buttonLink: "",
-    settings,
-    file: null,
-    fileUrl: "",
-    items: section.itemFields?.length ? [blankItem(section)] : [],
-  };
-}
-
-function formFromApi(section, data) {
-  const next = emptyForm(section);
-  next.sectionName = data.sectionName || section.name;
-  next.order = String(data.order ?? section.order);
-  next.title = data.title ?? "";
-  next.subtitle = data.subtitle ?? "";
-  next.description = data.description ?? "";
-  next.buttonText = data.button?.text ?? "";
-  next.buttonLink = data.button?.link ?? "";
-  for (const field of section.settings ?? []) {
-    next.settings[field.key] = data.settings?.[field.key] ?? "";
-  }
-  if (section.file?.key === "logo") next.fileUrl = data.settings?.logo || data.logo || "";
-  if (section.file?.key === "image") next.fileUrl = data.image || "";
-  const items = (data.items ?? []).map((raw) => itemFromApi(section, raw));
-  next.items = items.length ? items : next.items;
-  next.raw = data;
-  return next;
 }
 
 function shown(value) {
@@ -202,45 +148,6 @@ function ProjectsBoard({ form }) {
   );
 }
 
-function itemIsEmpty(section, item) {
-  const hasText = (section.itemFields ?? []).some((field) => field.type !== "file" && String(item[field.key] ?? "").trim());
-  const hasFile = item.imageFile instanceof File && item.imageFile.size > 0;
-  return !hasText && !hasFile && !item.imageUrl;
-}
-
-function appendForm(section, form) {
-  const body = new FormData();
-  body.append("sectionKey", section.key);
-  body.append("sectionName", form.sectionName.trim() || section.name);
-  body.append("order", String(form.order ?? section.order));
-  for (const key of section.scalars ?? []) body.append(key, form[key] ?? "");
-  if (section.button) {
-    body.append("button[text]", form.buttonText ?? "");
-    body.append("button[link]", form.buttonLink ?? "");
-  }
-  for (const field of section.settings ?? []) {
-    body.append(`settings[${field.key}]`, form.settings?.[field.key] ?? "");
-  }
-  if (form.file instanceof File && form.file.size > 0) {
-    body.append(section.file.key, form.file, form.file.name);
-  }
-  const items = (form.items ?? []).filter((item) => !itemIsEmpty(section, item));
-  items.forEach((item, index) => {
-    for (const field of section.itemFields ?? []) {
-      if (field.type === "file") {
-        if (item.imageFile instanceof File && item.imageFile.size > 0) {
-          body.append(`items[${index}][${field.key}]`, item.imageFile, item.imageFile.name);
-        } else if (item.imageUrl) {
-          body.append(`items[${index}][${field.key}]`, item.imageUrl);
-        }
-      } else {
-        body.append(`items[${index}][${field.key}]`, item[field.key] ?? "");
-      }
-    }
-  });
-  return body;
-}
-
 function FileField({ label, file, url, onChange }) {
   return (
     <label className="flex flex-col gap-2 text-sm sm:col-span-2">
@@ -257,20 +164,20 @@ function FileField({ label, file, url, onChange }) {
 }
 
 export function LandingSectionPage({ sectionKey, mode = "view" }) {
-  const section = findSection(sectionKey);
   const navigate = useNavigate();
   const isAdd = mode === "add";
   const isEdit = mode === "edit";
   const [form, setForm] = useState(null);
   const [deleteOpen, setDeleteOpen] = useState(false);
-  const skipLoad = isAdd && section?.key === "header";
-  const sectionQuery = useLandingSection(section?.key, { enabled: Boolean(section) && !skipLoad });
+  const skipLoad = isAdd;
+  const sectionQuery = useLandingSection(sectionKey, { enabled: Boolean(sectionKey) && !skipLoad });
+  const section = resolveSection(sectionKey, sectionQuery.data);
   const saveSection = useSaveLandingSection();
   const statusChange = useLandingStatus();
   const deleteSection = useDeleteLandingSection();
 
   useEffect(() => {
-    const current = findSection(sectionKey);
+    const current = resolveSection(sectionKey, sectionQuery.data);
     if (!current) return;
     if (skipLoad) {
       setForm(emptyForm(current));
@@ -294,10 +201,11 @@ export function LandingSectionPage({ sectionKey, mode = "view" }) {
   async function onSubmit(event) {
     event.preventDefault();
     try {
+      const missing = sectionQuery.isError && sectionQuery.error?.response?.status === 404;
       const body = await saveSection.mutateAsync({
         sectionKey: section.key,
-        body: appendForm(section, form),
-        create: isAdd,
+        body: sectionBody(section, form),
+        create: isAdd || missing,
       });
       toast.success(body?.message || `${section.name} saved`);
       if (isAdd || isEdit) navigate(section.path);
@@ -307,8 +215,7 @@ export function LandingSectionPage({ sectionKey, mode = "view" }) {
   }
 
   const hasAddPage = section.key === "header" || section.key === "projects";
-  const addLabel = section.key === `Add ${section.name}`;
-  const pageTitle = isAdd ? addLabel : isEdit ? `Edit ${section.name}` : section.key === `Edit ${section.name}` && form?.title ? form.title : section.name;
+  const pageTitle = isAdd ? `Add ${section.name}` : isEdit ? `Edit ${section.name}` : section.name;
   const pageDescription = isAdd
     ? section.key === "header"
       ? "Create the header. This page does not load the saved header."
@@ -338,6 +245,7 @@ export function LandingSectionPage({ sectionKey, mode = "view" }) {
       toast.success(body?.message || `${section.name} deleted`);
       setForm(emptyForm(section));
       setDeleteOpen(false);
+      if (section.custom) navigate("/header", { replace: true });
     } catch (err) {
       toast.error(messageFromApi(err, "Could not delete this section"));
     }
