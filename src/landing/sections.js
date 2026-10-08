@@ -147,7 +147,103 @@ export const landingSections = [
   },
 ];
 
+export const ITEM_FIELD_TYPES = [
+  { key: "title", label: "Title" },
+  { key: "description", label: "Description", type: "area" },
+  { key: "image", label: "Image", type: "file" },
+  { key: "link", label: "Link" },
+  { key: "number", label: "Number" },
+  { key: "category", label: "Category" },
+  { key: "name", label: "Name" },
+  { key: "label", label: "Label" },
+  { key: "value", label: "Value" },
+  { key: "icon", label: "Icon" },
+  { key: "message", label: "Message", type: "area" },
+];
+
+const ITEM_FIELD_STORE = "northline-section-item-fields";
+const DEFAULT_ITEM_FIELDS = [
+  { key: "title", label: "Title" },
+  { key: "description", label: "Description", type: "area" },
+];
+
 export const RESERVED_SECTION_KEYS = new Set(["sections", "new", "config", "reorder"]);
+
+export function fieldKindLabel(field) {
+  if (field?.type === "file") return "Image";
+  if (field?.key === "description") return "Rich text";
+  if (field?.type === "area") return "Long text";
+  return "Text";
+}
+
+export function itemFieldsByKeys(keys) {
+  return normalizeItemFields(keys) ?? [];
+}
+
+export function normalizeItemFields(fields) {
+  if (!Array.isArray(fields)) return null;
+  const seen = new Set();
+  const next = [];
+  for (const field of fields) {
+    const key = typeof field === "string" ? field : field?.key;
+    const match = ITEM_FIELD_TYPES.find((item) => item.key === key);
+    if (!match || seen.has(match.key)) continue;
+    seen.add(match.key);
+    next.push({ ...match });
+  }
+  return next;
+}
+
+export function serializeItemFields(fields) {
+  return JSON.stringify(
+    (normalizeItemFields(fields) ?? []).map(({ key, label, type }) => (type ? { key, label, type } : { key, label })),
+  );
+}
+
+function readItemFieldStore() {
+  try {
+    const parsed = JSON.parse(localStorage.getItem(ITEM_FIELD_STORE) || "{}");
+    return parsed && typeof parsed === "object" ? parsed : {};
+  } catch {
+    return {};
+  }
+}
+
+export function rememberItemFields(sectionKey, fields) {
+  if (!isSectionSlug(sectionKey)) return;
+  const store = readItemFieldStore();
+  store[sectionKey] = normalizeItemFields(fields) ?? [];
+  localStorage.setItem(ITEM_FIELD_STORE, JSON.stringify(store));
+}
+
+export function forgetItemFields(sectionKey) {
+  const store = readItemFieldStore();
+  if (!Object.prototype.hasOwnProperty.call(store, sectionKey)) return;
+  delete store[sectionKey];
+  localStorage.setItem(ITEM_FIELD_STORE, JSON.stringify(store));
+}
+
+function rememberedItemFields(sectionKey) {
+  const store = readItemFieldStore();
+  if (!Object.prototype.hasOwnProperty.call(store, sectionKey)) return null;
+  return normalizeItemFields(store[sectionKey]) ?? [];
+}
+
+function itemFieldsOnRecord(record) {
+  const settings = record?.settings;
+  if (!settings || typeof settings !== "object" || Array.isArray(settings)) return null;
+  if (!Object.prototype.hasOwnProperty.call(settings, "itemFields")) return null;
+  const value = settings.itemFields;
+  let parsed = value;
+  if (typeof value === "string") {
+    try {
+      parsed = JSON.parse(value);
+    } catch {
+      return null;
+    }
+  }
+  return normalizeItemFields(parsed);
+}
 
 export function isSectionSlug(value) {
   return (
@@ -170,7 +266,8 @@ export function sectionSlug(name) {
     .replace(/-+$/g, "");
 }
 
-export function genericSection(sectionKey, name, order = 0) {
+export function genericSection(sectionKey, name, order = 0, itemFields) {
+  const fields = Array.isArray(itemFields) ? (normalizeItemFields(itemFields) ?? []) : DEFAULT_ITEM_FIELDS.map((field) => ({ ...field }));
   return {
     key: sectionKey,
     name: name || sectionKey,
@@ -180,10 +277,7 @@ export function genericSection(sectionKey, name, order = 0) {
     scalars: ["title", "subtitle", "description"],
     button: true,
     file: { key: "image", label: "Image" },
-    itemFields: [
-      { key: "title", label: "Title" },
-      { key: "description", label: "Description", type: "area" },
-    ],
+    itemFields: fields,
   };
 }
 
@@ -195,5 +289,6 @@ export function resolveSection(sectionKey, record) {
   const known = findSection(sectionKey);
   if (known) return known;
   if (!isSectionSlug(sectionKey)) return null;
-  return genericSection(sectionKey, record?.sectionName, record?.order ?? 0);
+  const stored = itemFieldsOnRecord(record) ?? rememberedItemFields(sectionKey);
+  return genericSection(sectionKey, record?.sectionName, record?.order ?? 0, stored === null ? undefined : stored);
 }

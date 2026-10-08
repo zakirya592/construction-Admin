@@ -1,13 +1,14 @@
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { Button } from "@heroui/react";
-import { Plus, Trash2 } from "lucide-react";
+import { Button, Modal } from "@heroui/react";
+import { Eye, Plus, Trash2 } from "lucide-react";
 import { toast } from "react-toastify";
 import { AreaControl, RichTextControl, TextControl } from "@/components/Fields";
 import { PageHeader } from "@/components/PageBits";
 import { blankItem, sectionBody } from "@/landing/payload";
 import { useLandingSections, useSaveLandingSection } from "@/landing/queries";
-import { findSection, genericSection, isSectionSlug, sectionSlug } from "@/landing/sections";
+import { PreviewImage, SectionPreview } from "@/pages/LandingSectionPage";
+import { ITEM_FIELD_TYPES, fieldKindLabel, findSection, forgetItemFields, genericSection, isSectionSlug, itemFieldsByKeys, rememberItemFields, sectionSlug } from "@/landing/sections";
 
 function messageFromApi(error, fallback) {
   const data = error?.response?.data;
@@ -16,8 +17,8 @@ function messageFromApi(error, fallback) {
   return data?.message || error?.message || fallback;
 }
 
-function contentFor(kind) {
-  const section = kind === "custom" ? genericSection("custom", "Section", 0) : findSection(kind);
+function contentFor(kind, itemFields) {
+  const section = kind === "custom" ? genericSection("custom", "Section", 0, itemFields ?? []) : findSection(kind);
   if (!section) return null;
   const settings = {};
   for (const field of section.settings ?? []) settings[field.key] = "";
@@ -40,12 +41,16 @@ export function AddSectionPage() {
   const [name, setName] = useState("");
   const [order, setOrder] = useState("11");
   const [orderTouched, setOrderTouched] = useState(false);
+  const [picked, setPicked] = useState([]);
   const [content, setContent] = useState(null);
+  const [previewOpen, setPreviewOpen] = useState(false);
 
   const slug = sectionSlug(name);
   const known = isSectionSlug(slug) ? findSection(slug) : null;
-  const section = known ?? (isSectionSlug(slug) ? genericSection(slug, name.trim() || slug, Number(order) || 0) : null);
+  const pickedFields = itemFieldsByKeys(picked);
+  const section = known ?? (isSectionSlug(slug) ? genericSection(slug, name.trim() || slug, Number(order) || 0, pickedFields) : null);
   const kind = known?.key ?? (section ? "custom" : "");
+  const pickedKey = pickedFields.map((field) => field.key).join(",");
   const taken = Boolean(slug) && (saved.data ?? []).some((row) => row.sectionKey === slug);
 
   useEffect(() => {
@@ -55,8 +60,30 @@ export function AddSectionPage() {
   }, [orderTouched, saved.data]);
 
   useEffect(() => {
-    setContent(kind ? contentFor(kind) : null);
+    setContent(kind ? contentFor(kind, kind === "custom" ? [] : undefined) : null);
   }, [kind]);
+
+  useEffect(() => {
+    if (kind !== "custom") return;
+    const fields = itemFieldsByKeys(pickedKey.split(",").filter(Boolean));
+    const draft = genericSection("custom", "Section", 0, fields);
+    setContent((current) => {
+      if (!current) return current;
+      if (!fields.length) return { ...current, items: [] };
+      const source = current.items.length ? current.items : [blankItem(draft)];
+      const items = source.map((item) => {
+        const next = blankItem(draft);
+        next.id = item.id;
+        next.imageFile = item.imageFile ?? null;
+        next.imageUrl = item.imageUrl ?? "";
+        for (const field of fields) {
+          if (field.type !== "file" && item[field.key] != null) next[field.key] = item[field.key];
+        }
+        return next;
+      });
+      return { ...current, items };
+    });
+  }, [kind, pickedKey]);
 
   function updateItem(id, patch) {
     setContent((current) => ({
@@ -78,6 +105,8 @@ export function AddSectionPage() {
           order,
         }),
       });
+      if (section.custom) rememberItemFields(section.key, section.itemFields);
+      else forgetItemFields(section.key);
       toast.success(body?.message || `${name.trim()} saved`);
       navigate(`/${section.key}`);
     } catch (err) {
@@ -90,7 +119,7 @@ export function AddSectionPage() {
       <PageHeader
         kicker="Landing"
         title="Add section"
-        description="Name the section, such as FAQ, and save it on the landing page."
+        description="Name the section. For a new section, choose which item field types to include."
       />
       <form className="flex flex-col gap-6" onSubmit={onSubmit}>
         <section className="rounded-2xl border border-line bg-white p-5 md:p-6">
@@ -109,7 +138,7 @@ export function AddSectionPage() {
             {slug ? (
               <p className="text-sm text-stone-500 sm:col-span-2">
                 Landing key: {slug}
-                {known ? ` · uses the ${known.name} fields` : ""}
+                {known ? ` · uses the ${known.name} fields` : section?.custom ? " · choose the item fields below" : ""}
               </p>
             ) : name.trim() ? (
               <p className="text-sm text-stone-500 sm:col-span-2">Use letters or numbers in the section name.</p>
@@ -177,11 +206,40 @@ export function AddSectionPage() {
                   className="block w-full text-sm text-stone-600 file:mr-3 file:rounded-xl file:border-0 file:bg-sand file:px-3 file:py-2 file:text-sm file:text-ink"
                   onChange={(event) => setContent((current) => ({ ...current, file: event.target.files?.[0] ?? null }))}
                 />
+                <PreviewImage file={content.file} className="h-28" />
                 <span className="text-xs text-stone-500">{content.file ? content.file.name : "No image yet"}</span>
               </label>
             )}
           </div>
         </section>
+
+        {section?.custom && !taken ? (
+          <section className="rounded-2xl border border-line bg-white p-5 md:p-6">
+            <h2 className="font-serif text-2xl">Item fields</h2>
+            <p className="mt-2 text-sm text-stone-500">Which types of item fields should this section include?</p>
+            <div className="mt-4 grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
+              {ITEM_FIELD_TYPES.map((field) => {
+                const selected = picked.includes(field.key);
+                return (
+                  <button
+                    key={field.key}
+                    type="button"
+                    aria-pressed={selected}
+                    onClick={() =>
+                      setPicked((current) =>
+                        current.includes(field.key) ? current.filter((key) => key !== field.key) : [...current, field.key],
+                      )
+                    }
+                    className={`rounded-xl border px-3 py-3 text-left ${selected ? "border-ink bg-ink text-white" : "border-line bg-paper text-ink"}`}
+                  >
+                    <span className="block text-sm font-medium">{field.label}</span>
+                    <span className={`mt-1 block text-xs ${selected ? "text-white/70" : "text-stone-500"}`}>{fieldKindLabel(field)}</span>
+                  </button>
+                );
+              })}
+            </div>
+          </section>
+        ) : null}
 
         {content?.items.map((item, index) => (
           <section key={item.id} className="rounded-2xl border border-line bg-white p-5 md:p-6">
@@ -210,6 +268,7 @@ export function AddSectionPage() {
                         className="block w-full text-sm text-stone-600 file:mr-3 file:rounded-xl file:border-0 file:bg-sand file:px-3 file:py-2 file:text-sm file:text-ink"
                         onChange={(event) => updateItem(item.id, { imageFile: event.target.files?.[0] ?? null })}
                       />
+                      <PreviewImage file={item.imageFile} className="h-28" />
                       <span className="text-xs text-stone-500">{item.imageFile ? item.imageFile.name : "No image yet"}</span>
                     </label>
                   );
@@ -258,11 +317,40 @@ export function AddSectionPage() {
               <Plus size={16} /> Add item
             </Button>
           ) : null}
+          {content && section ? (
+            <Button type="button" variant="outline" onPress={() => setPreviewOpen(true)}>
+              <Eye size={16} /> Preview
+            </Button>
+          ) : null}
           <Button type="submit" variant="primary" isDisabled={!section || taken || !name.trim()} isPending={saveSection.isPending}>
             Save section
           </Button>
         </div>
       </form>
+      {content && section ? (
+        <Modal isOpen={previewOpen} onOpenChange={setPreviewOpen}>
+          <Modal.Backdrop>
+            <Modal.Container>
+              <Modal.Dialog className="w-[90vw] max-w-[90vw]">
+                <Modal.CloseTrigger />
+                <Modal.Header>
+                  <Modal.Heading className="font-serif text-2xl">{name.trim() || "Section"} preview</Modal.Heading>
+                </Modal.Header>
+                <Modal.Body>
+                  <div className="overflow-hidden rounded-xl">
+                    <SectionPreview section={section} form={{ ...content, sectionName: name.trim(), fileUrl: "" }} />
+                  </div>
+                </Modal.Body>
+                <Modal.Footer>
+                  <Button slot="close" variant="ghost">
+                    Close
+                  </Button>
+                </Modal.Footer>
+              </Modal.Dialog>
+            </Modal.Container>
+          </Modal.Backdrop>
+        </Modal>
+      ) : null}
     </div>
   );
 }

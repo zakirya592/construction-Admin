@@ -1,3 +1,5 @@
+import { serializeItemFields } from "@/landing/sections";
+
 function blankItem(section) {
   const item = { id: crypto.randomUUID(), imageFile: null, imageUrl: "" };
   for (const field of section.itemFields ?? []) {
@@ -90,12 +92,13 @@ function jsonBody(section, form) {
   if (section.button) {
     payload.button = { text: form.buttonText ?? "", link: form.buttonLink ?? "" };
   }
-  if (section.settings?.length || section.file?.key === "logo") {
+  if (section.settings?.length || section.file?.key === "logo" || section.custom) {
     payload.settings = {};
     for (const field of section.settings ?? []) {
       payload.settings[field.key] = form.settings?.[field.key] ?? "";
     }
     if (section.file?.key === "logo") payload.settings.logo = form.fileUrl || payload.settings.logo || "";
+    if (section.custom) payload.settings.itemFields = serializeItemFields(section.itemFields);
   }
   if (section.itemFields?.length) {
     const items = (form.items ?? []).filter((item) => !itemIsEmpty(section, item)).map((item) => itemPayload(section, item));
@@ -122,6 +125,7 @@ function appendForm(section, form) {
   for (const field of section.settings ?? []) {
     body.append(`settings[${field.key}]`, form.settings?.[field.key] ?? "");
   }
+  if (section.custom) body.append("settings[itemFields]", serializeItemFields(section.itemFields));
   if (form.file instanceof File && form.file.size > 0) {
     body.append(section.file.key, form.file, form.file.name);
   }

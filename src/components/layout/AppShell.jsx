@@ -21,7 +21,19 @@ const icons = {
 };
 
 function sectionNav(saved) {
-  const custom = (saved ?? [])
+  const rows = Array.isArray(saved) ? saved : [];
+  const found = new Set(rows.map((section) => section?.sectionKey).filter(Boolean));
+  const known = landingSections
+    .filter((section) => found.has(section.key))
+    .map((section) => {
+      const row = rows.find((item) => item.sectionKey === section.key);
+      return {
+        to: section.path,
+        label: row?.sectionName || section.name,
+        icon: icons[section.key],
+      };
+    });
+  const custom = rows
     .filter((section) => section?.sectionKey && !findSection(section.sectionKey))
     .sort((left, right) => (left.order ?? 0) - (right.order ?? 0))
     .map((section) => ({
@@ -30,14 +42,7 @@ function sectionNav(saved) {
       icon: Layers,
     }));
 
-  return [
-    ...landingSections.map((section) => ({
-      to: section.path,
-      label: section.name,
-      icon: icons[section.key],
-    })),
-    ...custom,
-  ];
+  return [...known, ...custom];
 }
 
 function initials(name) {

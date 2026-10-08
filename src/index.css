@@ -98,9 +98,19 @@ body {
 
 .rich-text-view,
 .rich-text-view p {
+  color: inherit;
   white-space: normal;
   overflow-wrap: anywhere;
   word-break: break-word;
+}
+
+.footer-preview .footer-description,
+.footer-preview .footer-description * {
+  color: #e7e2d8 !important;
+}
+
+.footer-preview .footer-copyright {
+  color: #b7b1a8 !important;
 }
 
 .rich-text-view p {
@@ -135,6 +145,31 @@ body {
 
 .rich-text-view ol {
   list-style: decimal;
+}
+
+.testimonial-marquee {
+  overflow: hidden;
+}
+
+.testimonial-track {
+  display: flex;
+  width: max-content;
+  animation: testimonial-slide-ltr linear infinite;
+}
+
+@keyframes testimonial-slide-ltr {
+  from {
+    transform: translateX(-50%);
+  }
+  to {
+    transform: translateX(0);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .testimonial-track {
+    animation: none;
+  }
 }
 
 .header-preview-bar {

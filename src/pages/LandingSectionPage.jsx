@@ -1,13 +1,13 @@
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { Button, Chip, Modal } from "@heroui/react";
-import { Building2, ClipboardList, Clock, Eye, House, Pencil, Plus, ShieldCheck, Trash2, TriangleAlert, User, Users } from "lucide-react";
+import { ArrowUpRight, Building2, ChevronUp, ClipboardList, Clock, Eye, House, Mail, MapPin, Pencil, Phone, Plus, ShieldCheck, Trash2, TriangleAlert, User, Users } from "lucide-react";
 import { toast } from "react-toastify";
 import { DataTable } from "@/components/DataTable";
 import { AreaControl, ConfirmDialog, RichTextControl, TextControl } from "@/components/Fields";
 import { PageHeader } from "@/components/PageBits";
 import { blankItem, emptyForm, formFromApi, sectionBody } from "@/landing/payload";
-import { resolveSection } from "@/landing/sections";
+import { forgetItemFields, rememberItemFields, resolveSection } from "@/landing/sections";
 import { useDeleteLandingSection, useLandingSection, useLandingStatus, useSaveLandingSection } from "@/landing/queries";
 
 function messageFromApi(error, fallback) {
@@ -37,11 +37,17 @@ function shownDate(value) {
 }
 
 function plainText(value) {
-  return String(value ?? "")
+  const text = String(value ?? "")
     .replace(/<[^>]*>/g, " ")
     .replace(/&nbsp;/g, " ")
-    .replace(/\s+/g, " ")
-    .trim();
+    .replace(/&#(\d+);/g, (_, code) => String.fromCharCode(Number(code)))
+    .replace(/&#x([0-9a-f]+);/gi, (_, code) => String.fromCharCode(parseInt(code, 16)))
+    .replace(/&quot;/g, '"')
+    .replace(/&#39;|&apos;/g, "'")
+    .replace(/&lt;/g, "<")
+    .replace(/&gt;/g, ">")
+    .replace(/&amp;/g, "&");
+  return text.replace(/\s+/g, " ").trim();
 }
 
 function RichCopy({ html, className = "" }) {
@@ -213,7 +219,98 @@ function isGoalsSection(section) {
 }
 
 function hasSectionPreview(section) {
-  return ["header", "hero", "about", "services"].includes(section.key) || isVisionSection(section) || isGoalsSection(section);
+  return section.custom || ["header", "hero", "about", "services", "testimonials", "footer", "contact"].includes(section.key) || isVisionSection(section) || isGoalsSection(section);
+}
+
+function previewHeading(section) {
+  if (section.key === "hero") return "Hero preview";
+  if (section.key === "about") return "About preview";
+  if (section.key === "services") return "Services preview";
+  if (section.key === "testimonials") return "Testimonials preview";
+  if (section.key === "footer") return "Footer preview";
+  if (section.key === "contact") return "Contact preview";
+  if (isVisionSection(section)) return "Vision & Mission preview";
+  if (isGoalsSection(section)) return "Our Goals preview";
+  if (section.custom) return `${section.name} preview`;
+  return "Header preview";
+}
+
+const previewImageClass = "w-auto self-start border-[3px] border-[#1c1914] object-cover";
+
+export function PreviewImage({ file, url, className = "" }) {
+  const src = useLocalImage(file, url);
+  if (!src) return null;
+  return <img src={src} alt="" className={`${previewImageClass} ${className}`} />;
+}
+
+function itemHasPreviewContent(item) {
+  if (item.imageFile || item.imageUrl) return true;
+  return ["title", "subtitle", "description", "message", "link", "number", "category", "name", "label", "value", "icon", "position", "company", "group", "type"].some((key) => plainText(item[key]));
+}
+
+function CustomSectionDesign({ form, section }) {
+  const fields = section?.itemFields ?? [];
+  const show = (key) => !fields.length || fields.some((field) => field.key === key);
+  const items = (form.items ?? []).filter(itemHasPreviewContent);
+  return (
+    <div className="bg-[#f4efe6] px-6 py-10 text-ink sm:px-10 sm:py-12">
+      <div className="mx-auto max-w-2xl text-center">
+        {form.subtitle ? (
+          <p className="text-[11px] tracking-[0.22em] text-[#9a7433] uppercase">{form.subtitle}</p>
+        ) : form.sectionName ? (
+          <p className="text-[11px] tracking-[0.22em] text-stone-500 uppercase">{form.sectionName}</p>
+        ) : null}
+        {form.title ? <h2 className="mt-3 font-serif text-4xl leading-[1.05] sm:text-5xl">{form.title}</h2> : null}
+        <RichCopy html={form.description} className="mt-5 text-sm leading-relaxed text-stone-600" />
+        <div className="mt-6 flex justify-center">
+          <PreviewImage file={form.file} url={form.fileUrl} className="h-72" />
+        </div>
+      </div>
+      {form.buttonText ? (
+        <div className="mt-6 flex justify-center">
+          <span className="inline-flex border border-[#ead9ad] bg-[#c6a15b] px-4 py-2.5 text-sm font-medium text-[#1c1408]">{form.buttonText}</span>
+        </div>
+      ) : null}
+      {items.length ? (
+        <div className="mt-10 grid gap-5 sm:grid-cols-3">
+          {items.map((item) => (
+            <article key={item.id} className="border border-[#e4dccb] bg-white px-5 py-5 text-center">
+              {show("image") ? (
+                <div className="mb-4 flex justify-center">
+                  <PreviewImage file={item.imageFile} url={item.imageUrl} className="h-44" />
+                </div>
+              ) : null}
+              {show("number") && item.number ? <p className="text-xs tracking-[0.18em] text-[#9a7433]">{item.number}</p> : null}
+              {show("icon") && item.icon ? <p className="text-sm text-[#9a7433]">{item.icon}</p> : null}
+              {show("category") && item.category ? <p className="mt-2 text-[11px] tracking-[0.16em] text-stone-500 uppercase">{item.category}</p> : null}
+              {show("title") && item.title ? <h3 className="mt-2 font-serif text-2xl">{item.title}</h3> : null}
+              {show("name") && item.name ? <p className="mt-2 text-sm font-medium">{item.name}</p> : null}
+              {show("label") && item.label ? <p className="mt-2 text-sm font-medium">{item.label}</p> : null}
+              {show("value") && item.value ? <p className="mt-1 font-serif text-3xl text-[#c6a15b]">{item.value}</p> : null}
+              {show("position") && item.position ? <p className="mt-1 text-sm text-stone-500">{item.position}</p> : null}
+              {show("company") && item.company ? <p className="text-sm text-stone-500">{item.company}</p> : null}
+              {show("description") ? <RichCopy html={item.description} className="mt-2 text-sm leading-relaxed text-stone-600" /> : null}
+              {show("message") && plainText(item.message) ? <p className="mt-2 text-sm leading-relaxed text-stone-600 whitespace-pre-line">{item.message}</p> : null}
+              {show("link") && item.link ? <p className="mt-3 text-sm text-[#9a7433]">{item.link}</p> : null}
+            </article>
+          ))}
+        </div>
+      ) : null}
+    </div>
+  );
+}
+
+export function SectionPreview({ section, form }) {
+  if (section.key === "hero") return <HeroDesign form={form} />;
+  if (section.key === "about") return <AboutDesign form={form} />;
+  if (section.key === "services") return <ServicesDesign form={form} />;
+  if (section.key === "testimonials") return <TestimonialsDesign form={form} />;
+  if (section.key === "footer") return <FooterDesign form={form} />;
+  if (section.key === "contact") return <ContactDesign form={form} />;
+  if (isVisionSection(section)) return <VisionDesign form={form} />;
+  if (isGoalsSection(section)) return <AboutDesign form={form} imageSide="right" />;
+  if (section.custom) return <CustomSectionDesign form={form} section={section} />;
+  return <HeaderDesign form={form} />;
 }
 
 function VisionDesign({ form }) {
@@ -257,6 +354,274 @@ function ServicesDesign({ form }) {
         </div>
       ) : null}
     </div>
+  );
+}
+
+function TestimonialCard({ item }) {
+  const image = useLocalImage(item.imageFile, item.imageUrl);
+  const name = String(item.name ?? "").trim();
+  return (
+    <article className="flex w-52 shrink-0 flex-col items-center px-3">
+      <div className="grid h-36 w-36 place-items-center overflow-hidden rounded-full border border-[#e4dccb] bg-[#efe8db]">
+        {image ? (
+          <img src={image} alt="" className="h-full w-full object-cover" />
+        ) : (
+          <span className="font-serif text-3xl text-[#9a7433]">{name.slice(0, 1).toUpperCase() || "?"}</span>
+        )}
+      </div>
+      {name ? <p className="mt-4 text-center text-base font-medium">{name}</p> : null}
+    </article>
+  );
+}
+
+function TestimonialsDesign({ form }) {
+  const people = form.items.filter((item) => item.name || item.imageUrl || item.imageFile);
+  const loop = [];
+  if (people.length) {
+    while (loop.length < 6) loop.push(...people);
+  }
+  const track = [...loop, ...loop];
+  return (
+    <div className="overflow-hidden bg-[#f4efe6] py-10 text-ink">
+      <div className="px-6 sm:px-10">
+        <p className="text-[11px] tracking-[0.22em] text-stone-500 uppercase">{form.sectionName || "Testimonials"}</p>
+        {form.title ? <h2 className="mt-3 font-serif text-4xl leading-[1.05] sm:text-5xl">{form.title}</h2> : null}
+        <RichCopy html={form.description} className="mt-4 max-w-xl text-sm leading-relaxed text-stone-500" />
+      </div>
+      {track.length ? (
+        <div className="testimonial-marquee mt-10">
+          <div className="testimonial-track" style={{ animationDuration: `${Math.max(loop.length, 6) * 3.2}s` }}>
+            {track.map((item, index) => (
+              <TestimonialCard key={`${item.id}-${index}`} item={item} />
+            ))}
+          </div>
+        </div>
+      ) : (
+        <p className="mt-8 px-6 text-sm text-stone-500 sm:px-10">Add a name and image to preview the slider.</p>
+      )}
+    </div>
+  );
+}
+
+function isSocialItem(item) {
+  const group = String(item.group ?? "");
+  const label = String(item.label ?? "").trim();
+  return /social|follow/i.test(group) || /linkedin|instagram|twitter|^x$|^in$/i.test(label);
+}
+
+function footerColumns(items) {
+  const columns = [];
+  const indexByGroup = new Map();
+  for (const item of items) {
+    if (isSocialItem(item)) continue;
+    const title = String(item.group ?? "").trim();
+    const key = title.toLowerCase() || "__links";
+    if (!indexByGroup.has(key)) {
+      indexByGroup.set(key, columns.length);
+      columns.push({ title, links: [] });
+    }
+    const label = String(item.label ?? "").trim();
+    const link = String(item.link ?? "").trim();
+    if (label || link) columns[indexByGroup.get(key)].links.push({ id: item.id, text: label || link });
+  }
+  return columns.filter((column) => column.title || column.links.length);
+}
+
+function footerText(form, key) {
+  const settings = form.settings ?? {};
+  const rawSettings = form.raw?.settings ?? {};
+  const direct = settings[key] || rawSettings[key] || form.raw?.[key] || "";
+  if (direct) return String(direct).trim();
+  const match = Object.entries({ ...rawSettings, ...settings }).find(([name, value]) => name.toLowerCase() === key.toLowerCase() && value);
+  return match ? String(match[1]).trim() : "";
+}
+
+function SocialMark({ label }) {
+  const name = String(label ?? "").trim().toLowerCase();
+  if (name.includes("linkedin") || name === "in") {
+    return (
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+        <path d="M4.7 3.2a1.9 1.9 0 1 0 .1 3.8 1.9 1.9 0 0 0-.1-3.8ZM3.2 8.8h3.1V21H3.2V8.8Zm5.2 0h3v1.7h.1c.4-.8 1.5-1.8 3.1-1.8 3.3 0 3.9 2.2 3.9 5v7.3h-3.1v-6.5c0-1.6-.1-3.6-2.2-3.6s-2.5 1.7-2.5 3.5V21H8.4V8.8Z" />
+      </svg>
+    );
+  }
+  if (name.includes("instagram")) {
+    return (
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" aria-hidden="true">
+        <rect x="3.5" y="3.5" width="17" height="17" rx="4" />
+        <circle cx="12" cy="12" r="4" />
+        <circle cx="17.4" cy="6.6" r="0.8" fill="currentColor" stroke="none" />
+      </svg>
+    );
+  }
+  if (name === "x" || name.includes("twitter")) {
+    return (
+      <svg width="13" height="13" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+        <path d="M3.8 3.5h4.4l3.6 5.1 4.4-5.1h4L13.6 12l7 8.5h-4.4l-4-5.6-4.6 5.6H3.6l7-8.4L3.8 3.5Z" />
+      </svg>
+    );
+  }
+  return <span className="text-[10px] tracking-wide uppercase">{String(label ?? "").slice(0, 2)}</span>;
+}
+
+function FooterDesign({ form }) {
+  const logo = useLocalImage(form.file, form.fileUrl);
+  const brand = form.sectionName && form.sectionName !== "Footer" ? form.sectionName : "NOVA BUILD";
+  const mark = brand.trim().charAt(0).toUpperCase() || "N";
+  const items = form.items.filter((item) => item.label || item.link || item.group);
+  const social = items.filter(isSocialItem);
+  const columns = footerColumns(items);
+  const copyright = footerText(form, "copyright");
+  const description = plainText(form.description || form.raw?.description || "");
+  return (
+    <footer className="footer-preview bg-[#111111] px-6 py-12 text-white sm:px-10 sm:py-14">
+      <div className="flex flex-wrap items-start gap-x-16 gap-y-10">
+        <div className="max-w-xs shrink-0">
+          <div className="flex items-center gap-3">
+            {logo ? (
+              <img src={logo} alt="" className="h-10 w-10 object-contain" />
+            ) : (
+              <span className="grid h-10 w-10 place-items-center bg-[#c6a15b] font-serif text-lg text-[#1c1408]">{mark}</span>
+            )}
+            <span className="text-[13px] font-medium tracking-[0.28em] text-white uppercase">{brand}</span>
+          </div>
+          {description ? <p className="footer-description mt-6 max-w-xs text-sm leading-relaxed">{description}</p> : null}
+          {social.length ? (
+            <div className="mt-7 flex gap-3">
+              {social.map((item) => (
+                <span key={item.id} className="grid h-9 w-9 place-items-center border border-white/30 text-white">
+                  <SocialMark label={item.label || item.link} />
+                </span>
+              ))}
+            </div>
+          ) : null}
+        </div>
+        {columns.map((column) => (
+          <div key={column.title || "links"} className="min-w-36">
+            {column.title ? <p className="text-[11px] tracking-[0.22em] text-[#c6a15b] uppercase">{column.title}</p> : null}
+            <ul className={`${column.title ? "mt-4" : ""} flex flex-col gap-3 text-sm text-white`}>
+              {column.links.map((link) => (
+                <li key={link.id}>{link.text}</li>
+              ))}
+            </ul>
+          </div>
+        ))}
+      </div>
+      <div className="mt-16 flex items-center justify-between gap-4 border-t border-white/10 pt-5">
+        {copyright ? <p className="footer-copyright text-[13px]">{copyright}</p> : <span />}
+        <span className="grid h-8 w-8 shrink-0 place-items-center border border-white/20 text-[#c6a15b]">
+          <ChevronUp size={16} />
+        </span>
+      </div>
+    </footer>
+  );
+}
+
+function contactIcon(type, label) {
+  const name = `${type ?? ""} ${label ?? ""}`.toLowerCase();
+  if (/phone|mobile|tel/.test(name)) return Phone;
+  if (/mail|email/.test(name)) return Mail;
+  if (/hour|time|clock/.test(name)) return Clock;
+  return MapPin;
+}
+
+function contactDetails(form) {
+  const items = form.items.filter((item) => String(item.label ?? "").trim() || String(item.value ?? "").trim());
+  if (items.length) {
+    return items.map((item) => ({
+      id: item.id,
+      label: String(item.label ?? "").trim(),
+      value: String(item.value ?? "").trim(),
+      type: item.type,
+    }));
+  }
+  const settings = form.settings ?? {};
+  return [
+    { id: "address", label: "Studio", value: String(settings.address ?? "").trim(), type: "address" },
+    { id: "phone", label: "Phone", value: String(settings.phone ?? "").trim(), type: "phone" },
+    { id: "email", label: "Email", value: String(settings.email ?? "").trim(), type: "email" },
+    { id: "hours", label: "Hours", value: String(settings.hours ?? "").trim(), type: "hours" },
+  ].filter((row) => row.value);
+}
+
+function ContactDesign({ form }) {
+  const settings = form.settings ?? {};
+  const details = contactDetails(form);
+  const address = String(settings.address ?? "").trim() || details.find((row) => /address|studio|location|map/i.test(`${row.type ?? ""} ${row.label ?? ""}`))?.value || "";
+  const mapLink = String(settings.mapUrl ?? "").trim() || (address ? `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(address)}` : "");
+  const mapEmbed = /output=embed|\/maps\/embed/i.test(mapLink)
+    ? mapLink
+    : address
+      ? `https://maps.google.com/maps?q=${encodeURIComponent(address)}&z=15&output=embed`
+      : "";
+  const eyebrow = form.sectionName && form.sectionName !== "Contact" ? form.sectionName : "";
+  return (
+    <div className="bg-[#f4efe6] px-5 py-8 text-ink sm:px-8 sm:py-10">
+      <div className="grid items-start gap-8 sm:grid-cols-2 sm:gap-10">
+        <div>
+          {form.title ? <h2 className="font-serif text-4xl leading-[1.05] sm:text-5xl">{form.title}</h2> : null}
+          {details.length ? (
+            <ul className={`divide-y divide-[#e4dccb] border-[#e4dccb] ${form.title ? "mt-8 border-y" : "border-y"}`}>
+              {details.map((row) => {
+                const Icon = contactIcon(row.type, row.label);
+                return (
+                  <li key={row.id} className="flex gap-4 py-4">
+                    <Icon size={16} className="mt-0.5 shrink-0 text-stone-500" />
+                    <div>
+                      {row.label ? <p className="text-[11px] tracking-[0.18em] text-stone-500 uppercase">{row.label}</p> : null}
+                      {row.value ? <p className="mt-1 text-sm leading-relaxed whitespace-pre-line">{row.value}</p> : null}
+                    </div>
+                  </li>
+                );
+              })}
+            </ul>
+          ) : null}
+          {mapEmbed || mapLink ? (
+            <div className="relative mt-6 h-56 overflow-hidden border border-[#e4dccb] bg-[#d9d3c6]">
+              {mapEmbed ? (
+                <iframe title="Map" src={mapEmbed} className="pointer-events-none h-full w-full border-0" referrerPolicy="no-referrer-when-downgrade" />
+              ) : null}
+              {mapLink ? (
+                <>
+                  <a href={mapLink} target="_blank" rel="noreferrer" className="absolute top-3 left-3 inline-flex items-center gap-1 bg-white px-2 py-1 text-xs text-ink shadow-sm">
+                    Open in Maps <ArrowUpRight size={12} />
+                  </a>
+                  <a href={mapLink} target="_blank" rel="noreferrer" className="absolute bottom-3 left-3 bg-black px-3 py-2 text-[11px] tracking-[0.14em] text-white uppercase">
+                    Open in Google Maps
+                  </a>
+                </>
+              ) : null}
+            </div>
+          ) : null}
+        </div>
+        <div className="border border-[#e4d3a4] bg-white px-5 py-6 sm:px-7 sm:py-7">
+          {eyebrow ? <p className="text-[11px] tracking-[0.2em] text-[#9a7433] uppercase">{eyebrow}</p> : null}
+          <h3 className={`font-serif text-3xl ${eyebrow ? "mt-3" : ""}`}>Project Inquiry</h3>
+          <RichCopy html={form.description} className="mt-3 text-sm leading-relaxed text-stone-500" />
+          <div className="mt-6 grid gap-4 sm:grid-cols-2">
+            <ContactField label="Full name" value="Jane Cooper" />
+            <ContactField label="Email" value="jane@studio.com" />
+            <ContactField label="Phone" value="+1 (555) 000-0000" />
+            <ContactField label="Project type" value="Select a type" select />
+            <ContactField label="Budget" value="Select a range" select className="sm:col-span-2" />
+            <ContactField label="Message" value="Project details, location, timeline..." area className="sm:col-span-2" />
+          </div>
+          <span className="mt-5 flex items-center justify-center bg-[#c6a15b] px-4 py-3 text-sm text-[#1c1408]">Send Inquiry →</span>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function ContactField({ label, value, select = false, area = false, className = "" }) {
+  return (
+    <label className={`block ${className}`}>
+      <span className="text-[11px] tracking-[0.16em] text-stone-500 uppercase">{label}</span>
+      <span className={`mt-2 flex items-center border border-[#e7e0d2] bg-[#fbf8f2] px-3 text-sm text-stone-500 ${area ? "min-h-24 items-start py-3" : "h-11"}`}>
+        <span className="min-w-0 flex-1">{value}</span>
+        {select ? <span className="text-stone-400">▾</span> : null}
+      </span>
+    </label>
   );
 }
 
@@ -415,7 +780,7 @@ function FileField({ label, file, url, onChange }) {
         className="block w-full text-sm text-stone-600 file:mr-3 file:rounded-xl file:border-0 file:bg-sand file:px-3 file:py-2 file:text-sm file:text-ink"
         onChange={(event) => onChange(event.target.files?.[0] ?? null)}
       />
-      {src ? <img src={src} alt="" className="h-28 w-full max-w-xs rounded-xl object-cover" /> : null}
+      {src ? <img src={src} alt="" className={`h-28 ${previewImageClass}`} /> : null}
       <span className="text-xs text-stone-500">{file ? file.name : url || "No image yet"}</span>
     </label>
   );
@@ -466,6 +831,7 @@ export function LandingSectionPage({ sectionKey, mode = "view" }) {
         body: sectionBody(section, form),
         create: isAdd || missing,
       });
+      if (section.custom) rememberItemFields(section.key, section.itemFields);
       toast.success(body?.message || `${section.name} saved`);
       if (isAdd || isEdit) navigate(section.path);
     } catch (err) {
@@ -504,7 +870,10 @@ export function LandingSectionPage({ sectionKey, mode = "view" }) {
       toast.success(body?.message || `${section.name} deleted`);
       setForm(emptyForm(section));
       setDeleteOpen(false);
-      if (section.custom) navigate("/header", { replace: true });
+      if (section.custom) {
+        forgetItemFields(section.key);
+        navigate("/header", { replace: true });
+      }
     } catch (err) {
       toast.error(messageFromApi(err, "Could not delete this section"));
     }
@@ -564,21 +933,21 @@ export function LandingSectionPage({ sectionKey, mode = "view" }) {
           <section className="rounded-2xl border border-line bg-white p-5 md:p-6">
             <h2 className="font-serif text-2xl">Section</h2>
             <div className="mt-4 grid gap-4 sm:grid-cols-2">
-              <TextControl label="Section name" value={form.sectionName} onChange={(sectionName) => setForm({ ...form, sectionName })} />
-              <TextControl label="Order" type="number" value={form.order} onChange={(order) => setForm({ ...form, order })} />
+              <TextControl label="Section name" value={form.sectionName} onChange={(sectionName) => setForm((current) => ({ ...current, sectionName }))} />
+              <TextControl label="Order" type="number" value={form.order} onChange={(order) => setForm((current) => ({ ...current, order }))} />
               {(section.scalars ?? []).map((key) =>
                 key === "description" ? (
                   <div key={key} className="sm:col-span-2">
-                    <RichTextControl label="Description" value={form.description} onChange={(description) => setForm({ ...form, description })} />
+                    <RichTextControl label="Description" value={form.description} onChange={(description) => setForm((current) => ({ ...current, description }))} />
                   </div>
                 ) : (
-                  <TextControl key={key} label={key === "subtitle" ? "Subtitle" : "Title"} value={form[key]} onChange={(value) => setForm({ ...form, [key]: value })} />
+                  <TextControl key={key} label={key === "subtitle" ? "Subtitle" : "Title"} value={form[key]} onChange={(value) => setForm((current) => ({ ...current, [key]: value }))} />
                 ),
               )}
               {section.button && (
                 <>
-                  <TextControl label="Button text" value={form.buttonText} onChange={(buttonText) => setForm({ ...form, buttonText })} />
-                  <TextControl label="Button link" value={form.buttonLink} onChange={(buttonLink) => setForm({ ...form, buttonLink })} />
+                  <TextControl label="Button text" value={form.buttonText} onChange={(buttonText) => setForm((current) => ({ ...current, buttonText }))} />
+                  <TextControl label="Button link" value={form.buttonLink} onChange={(buttonLink) => setForm((current) => ({ ...current, buttonLink }))} />
                 </>
               )}
               {(section.settings ?? []).map((field) => (
@@ -586,10 +955,10 @@ export function LandingSectionPage({ sectionKey, mode = "view" }) {
                   key={field.key}
                   label={field.label}
                   value={form.settings[field.key] ?? ""}
-                  onChange={(value) => setForm({ ...form, settings: { ...form.settings, [field.key]: value } })}
+                  onChange={(value) => setForm((current) => ({ ...current, settings: { ...current.settings, [field.key]: value } }))}
                 />
               ))}
-              {section.file && <FileField label={section.file.label} file={form.file} url={form.fileUrl} onChange={(file) => setForm({ ...form, file })} />}
+              {section.file && <FileField label={section.file.label} file={form.file} url={form.fileUrl} onChange={(file) => setForm((current) => ({ ...current, file }))} />}
             </div>
           </section>
 
@@ -601,7 +970,7 @@ export function LandingSectionPage({ sectionKey, mode = "view" }) {
                   isIconOnly
                   aria-label={`Remove item ${index + 1}`}
                   variant="ghost"
-                  onPress={() => setForm({ ...form, items: form.items.filter((entry) => entry.id !== item.id) })}
+                  onPress={() => setForm((current) => ({ ...current, items: current.items.filter((entry) => entry.id !== item.id) }))}
                 >
                   <Trash2 size={16} />
                 </Button>
@@ -644,7 +1013,7 @@ export function LandingSectionPage({ sectionKey, mode = "view" }) {
 
           <div className="flex flex-wrap items-center gap-3">
             {section.itemFields?.length ? (
-              <Button type="button" variant="outline" onPress={() => setForm({ ...form, items: [...form.items, blankItem(section)] })}>
+              <Button type="button" variant="outline" onPress={() => setForm((current) => ({ ...current, items: [...current.items, blankItem(section)] }))}>
                 <Plus size={16} /> Add item
               </Button>
             ) : null}
@@ -661,35 +1030,11 @@ export function LandingSectionPage({ sectionKey, mode = "view" }) {
               <Modal.Dialog className="w-[90vw] max-w-[90vw]">
                 <Modal.CloseTrigger />
                 <Modal.Header>
-                  <Modal.Heading className="font-serif text-2xl">
-                    {section.key === "hero"
-                      ? "Hero preview"
-                      : section.key === "about"
-                        ? "About preview"
-                        : section.key === "services"
-                          ? "Services preview"
-                          : isVisionSection(section)
-                            ? "Vision & Mission preview"
-                            : isGoalsSection(section)
-                              ? "Our Goals preview"
-                              : "Header preview"}
-                  </Modal.Heading>
+                  <Modal.Heading className="font-serif text-2xl">{previewHeading(section)}</Modal.Heading>
                 </Modal.Header>
                 <Modal.Body>
                   <div className="overflow-hidden rounded-xl">
-                    {section.key === "hero" ? (
-                      <HeroDesign form={form} />
-                    ) : section.key === "about" ? (
-                      <AboutDesign form={form} />
-                    ) : section.key === "services" ? (
-                      <ServicesDesign form={form} />
-                    ) : isVisionSection(section) ? (
-                      <VisionDesign form={form} />
-                    ) : isGoalsSection(section) ? (
-                      <AboutDesign form={form} imageSide="right" />
-                    ) : (
-                      <HeaderDesign form={form} />
-                    )}
+                    <SectionPreview section={section} form={form} />
                   </div>
                 </Modal.Body>
                 <Modal.Footer>
