@@ -300,6 +300,11 @@ function CustomSectionDesign({ form, section }) {
   );
 }
 
+export function AnySectionPreview({ section, form }) {
+  if (!hasSectionPreview(section)) return <CustomSectionDesign form={form} section={section} />;
+  return <SectionPreview section={section} form={form} />;
+}
+
 export function SectionPreview({ section, form }) {
   if (section.key === "hero") return <HeroDesign form={form} />;
   if (section.key === "about") return <AboutDesign form={form} />;

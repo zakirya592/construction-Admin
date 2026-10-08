@@ -2,8 +2,9 @@ import { NavLink, Outlet, useLocation, useNavigate } from "react-router-dom";
 import { Button } from "@heroui/react";
 import { motion } from "framer-motion";
 import { BadgeCheck, HardHat, Image, Info, Layers, ListOrdered, LogOut, Megaphone, PanelBottom, PanelTop, Phone, Plus, Quote, Wrench } from "lucide-react";
-import { findSection, landingSections } from "@/landing/sections";
+import { AllPreview, previewRows } from "@/components/layout/AllPreview";
 import { useLandingSections } from "@/landing/queries";
+import { findSection, landingSections } from "@/landing/sections";
 import { useOffice } from "@/office";
 
 const icons = {
@@ -20,29 +21,29 @@ const icons = {
   footer: PanelBottom,
 };
 
+function navItem(row) {
+  const section = findSection(row.sectionKey);
+  return {
+    to: section?.path || `/${row.sectionKey}`,
+    label: row.sectionName || section?.name || row.sectionKey,
+    icon: icons[row.sectionKey] || Layers,
+  };
+}
+
 function sectionNav(saved) {
   const rows = Array.isArray(saved) ? saved : [];
-  const found = new Set(rows.map((section) => section?.sectionKey).filter(Boolean));
-  const known = landingSections
-    .filter((section) => found.has(section.key))
+  const ordered = previewRows(rows);
+  const orderedKeys = new Set(ordered.map((row) => row.sectionKey));
+  const listed = ordered.map(navItem);
+  const rest = landingSections
+    .filter((section) => rows.some((row) => row.sectionKey === section.key) && !orderedKeys.has(section.key))
     .map((section) => {
       const row = rows.find((item) => item.sectionKey === section.key);
-      return {
-        to: section.path,
-        label: row?.sectionName || section.name,
-        icon: icons[section.key],
-      };
+      return navItem({ ...row, sectionKey: section.key, sectionName: row?.sectionName });
     });
-  const custom = rows
-    .filter((section) => section?.sectionKey && !findSection(section.sectionKey))
-    .sort((left, right) => (left.order ?? 0) - (right.order ?? 0))
-    .map((section) => ({
-      to: `/${section.sectionKey}`,
-      label: section.sectionName || section.sectionKey,
-      icon: Layers,
-    }));
-
-  return [...known, ...custom];
+  const footer = listed.filter((item) => item.to === "/footer");
+  const main = listed.filter((item) => item.to !== "/footer");
+  return [...main, ...rest, ...footer];
 }
 
 function initials(name) {
@@ -78,6 +79,7 @@ export function AppShell() {
             <Button variant="primary" className="rounded-full px-4" onPress={() => navigate("/sections/new")}>
               <Plus size={15} /> Add Section
             </Button>
+            <AllPreview saved={saved.data} />
             <span className="hidden h-8 w-px bg-line sm:block" aria-hidden="true" />
             <div className="flex min-w-0 items-center gap-2.5 rounded-full bg-white/80 py-1 pr-3 pl-1 ring-1 ring-line">
               <span className="grid h-8 w-8 shrink-0 place-items-center rounded-full bg-sand text-xs font-semibold text-ink">{initials(user?.name)}</span>

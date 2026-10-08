@@ -1,4 +1,4 @@
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useMutation, useQueries, useQuery, useQueryClient } from "@tanstack/react-query";
 import newRequest from "@/utils/userRequest";
 
 export const landingKeys = {
@@ -35,6 +35,21 @@ export function useLandingSection(sectionKey, { enabled = true } = {}) {
       const body = assertOk(response, "Could not load this section");
       return body?.data ?? null;
     },
+  });
+}
+
+export function useLandingSectionDetails(sectionKeys, enabled = true) {
+  const keys = Array.isArray(sectionKeys) ? sectionKeys.filter(Boolean) : [];
+  return useQueries({
+    queries: keys.map((sectionKey) => ({
+      queryKey: landingKeys.section(sectionKey),
+      enabled: enabled && Boolean(sectionKey),
+      queryFn: async () => {
+        const response = await newRequest.get(`/api/landing-page/${sectionKey}`);
+        const body = assertOk(response, "Could not load this section");
+        return body?.data ?? null;
+      },
+    })),
   });
 }
 
