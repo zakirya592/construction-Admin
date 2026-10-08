@@ -219,20 +219,24 @@ function isGoalsSection(section) {
 }
 
 function hasSectionPreview(section) {
-  return section.custom || ["header", "hero", "about", "services", "testimonials", "footer", "contact"].includes(section.key) || isVisionSection(section) || isGoalsSection(section);
+  return Boolean(section?.key);
 }
 
 function previewHeading(section) {
+  if (section.key === "header") return "Header preview";
   if (section.key === "hero") return "Hero preview";
   if (section.key === "about") return "About preview";
   if (section.key === "services") return "Services preview";
+  if (section.key === "projects") return "Projects preview";
+  if (section.key === "why-us") return "Why Us preview";
+  if (section.key === "process") return "Process preview";
   if (section.key === "testimonials") return "Testimonials preview";
+  if (section.key === "cta") return "CTA preview";
   if (section.key === "footer") return "Footer preview";
   if (section.key === "contact") return "Contact preview";
   if (isVisionSection(section)) return "Vision & Mission preview";
   if (isGoalsSection(section)) return "Our Goals preview";
-  if (section.custom) return `${section.name} preview`;
-  return "Header preview";
+  return `${section.name} preview`;
 }
 
 const previewImageClass = "w-auto self-start border-[3px] border-[#1c1914] object-cover";
@@ -248,9 +252,30 @@ function itemHasPreviewContent(item) {
   return ["title", "subtitle", "description", "message", "link", "number", "category", "name", "label", "value", "icon", "position", "company", "group", "type"].some((key) => plainText(item[key]));
 }
 
+function ItemFieldPreview({ field, item }) {
+  if (field.type === "file") {
+    if (!(item.imageFile instanceof File) && !item.imageUrl) return null;
+    return (
+      <div className="mb-4 flex justify-center">
+        <PreviewImage file={item.imageFile} url={item.imageUrl} className="h-44" />
+      </div>
+    );
+  }
+  const value = item[field.key];
+  if (field.key === "description") return <RichCopy html={value} className="mt-2 text-sm leading-relaxed text-stone-600" />;
+  if (!plainText(value)) return null;
+  if (field.type === "area") return <p className="mt-2 text-sm leading-relaxed text-stone-600 whitespace-pre-line">{value}</p>;
+  if (field.key === "title") return <h3 className="mt-2 font-serif text-2xl">{value}</h3>;
+  if (field.key === "value") return <p className="mt-1 font-serif text-3xl text-[#c6a15b]">{value}</p>;
+  if (field.key === "number" || field.key === "category" || field.key === "icon") {
+    return <p className="text-xs tracking-[0.18em] text-[#9a7433] uppercase">{value}</p>;
+  }
+  if (field.key === "link") return <p className="mt-3 text-sm text-[#9a7433]">{value}</p>;
+  return <p className="mt-2 text-sm text-ink">{value}</p>;
+}
+
 function CustomSectionDesign({ form, section }) {
   const fields = section?.itemFields ?? [];
-  const show = (key) => !fields.length || fields.some((field) => field.key === key);
   const items = (form.items ?? []).filter(itemHasPreviewContent);
   return (
     <div className="bg-[#f4efe6] px-6 py-10 text-ink sm:px-10 sm:py-12">
@@ -271,27 +296,13 @@ function CustomSectionDesign({ form, section }) {
           <span className="inline-flex border border-[#ead9ad] bg-[#c6a15b] px-4 py-2.5 text-sm font-medium text-[#1c1408]">{form.buttonText}</span>
         </div>
       ) : null}
-      {items.length ? (
+      {fields.length && items.length ? (
         <div className="mt-10 grid gap-5 sm:grid-cols-3">
           {items.map((item) => (
             <article key={item.id} className="border border-[#e4dccb] bg-white px-5 py-5 text-center">
-              {show("image") ? (
-                <div className="mb-4 flex justify-center">
-                  <PreviewImage file={item.imageFile} url={item.imageUrl} className="h-44" />
-                </div>
-              ) : null}
-              {show("number") && item.number ? <p className="text-xs tracking-[0.18em] text-[#9a7433]">{item.number}</p> : null}
-              {show("icon") && item.icon ? <p className="text-sm text-[#9a7433]">{item.icon}</p> : null}
-              {show("category") && item.category ? <p className="mt-2 text-[11px] tracking-[0.16em] text-stone-500 uppercase">{item.category}</p> : null}
-              {show("title") && item.title ? <h3 className="mt-2 font-serif text-2xl">{item.title}</h3> : null}
-              {show("name") && item.name ? <p className="mt-2 text-sm font-medium">{item.name}</p> : null}
-              {show("label") && item.label ? <p className="mt-2 text-sm font-medium">{item.label}</p> : null}
-              {show("value") && item.value ? <p className="mt-1 font-serif text-3xl text-[#c6a15b]">{item.value}</p> : null}
-              {show("position") && item.position ? <p className="mt-1 text-sm text-stone-500">{item.position}</p> : null}
-              {show("company") && item.company ? <p className="text-sm text-stone-500">{item.company}</p> : null}
-              {show("description") ? <RichCopy html={item.description} className="mt-2 text-sm leading-relaxed text-stone-600" /> : null}
-              {show("message") && plainText(item.message) ? <p className="mt-2 text-sm leading-relaxed text-stone-600 whitespace-pre-line">{item.message}</p> : null}
-              {show("link") && item.link ? <p className="mt-3 text-sm text-[#9a7433]">{item.link}</p> : null}
+              {fields.map((field) => (
+                <ItemFieldPreview key={field.key} field={field} item={item} />
+              ))}
             </article>
           ))}
         </div>
@@ -306,6 +317,7 @@ export function AnySectionPreview({ section, form }) {
 }
 
 export function SectionPreview({ section, form }) {
+  if (section.key === "header") return <HeaderDesign form={form} />;
   if (section.key === "hero") return <HeroDesign form={form} />;
   if (section.key === "about") return <AboutDesign form={form} />;
   if (section.key === "services") return <ServicesDesign form={form} />;
@@ -314,8 +326,7 @@ export function SectionPreview({ section, form }) {
   if (section.key === "contact") return <ContactDesign form={form} />;
   if (isVisionSection(section)) return <VisionDesign form={form} />;
   if (isGoalsSection(section)) return <AboutDesign form={form} imageSide="right" />;
-  if (section.custom) return <CustomSectionDesign form={form} section={section} />;
-  return <HeaderDesign form={form} />;
+  return <CustomSectionDesign form={form} section={section} />;
 }
 
 function VisionDesign({ form }) {
@@ -690,9 +701,20 @@ function HeaderPreview({ form }) {
   );
 }
 
+function PictureDetail({ label, file, url }) {
+  const src = useLocalImage(file, url);
+  return (
+    <div>
+      <p className="text-[11px] tracking-[0.16em] text-stone-500 uppercase">{label}</p>
+      {src ? <img src={src} alt="" className="mt-2 h-16 w-auto max-w-40 object-contain" /> : <p className="mt-1 text-sm text-ink">—</p>}
+    </div>
+  );
+}
+
 function HeaderBoard({ form }) {
   const record = form.raw ?? {};
   const settings = record.settings ?? {};
+  const imageUrl = typeof record.image === "string" ? record.image : "";
   return (
     <div className="flex flex-col gap-6">
       <HeaderPreview form={form} />
@@ -704,15 +726,12 @@ function HeaderBoard({ form }) {
           <Detail label="Title" value={form.title} />
           <Detail label="Subtitle" value={form.subtitle} />
           <Detail label="Description" value={form.description} />
-          <Detail label="Image" value={record.image} />
+          <PictureDetail label="Image" url={imageUrl} />
           <Detail label="Button text" value={form.buttonText} />
           <Detail label="Button link" value={form.buttonLink} />
-          <Detail label="Logo" value={settings.logo || form.fileUrl} />
+          <PictureDetail label="Logo" file={form.file} url={form.fileUrl || (typeof settings.logo === "string" ? settings.logo : "")} />
           <Detail label="Phone" value={settings.phone || form.settings.phone} />
           <Detail label="Email" value={settings.email || form.settings.email} />
-          <Detail label="Created" value={shownDate(record.createdAt)} />
-          <Detail label="Updated" value={shownDate(record.updatedAt)} />
-          <Detail label="ID" value={record._id || record.id} />
         </div>
       </section>
       <DataTable
